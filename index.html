@@ -55,7 +55,6 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 // ===== Settings =====
 const KEY = '';     // free MBTA API key (api-v3.mbta.com) – optional but recommended
 const SYNC = '';    // Google Apps Script web app URL – optional, sends your log to a Google Sheet
-const HOME = null;  // e.g. {lat:42.34, lon:-71.14} – opens the ride log when you're within ~150 m. This file is public!
 // ====================
 
 const API = 'https://api-v3.mbta.com';
@@ -71,7 +70,7 @@ const GROUPS = [
   {r:['Green-B','Green-C'],d:1,c:'G'}
 ];
 const $ = id => document.getElementById(id);
-let stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains';
+let lines = null, stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains', showDone = false, ckT = null;
 
 function load(){ try { return JSON.parse(localStorage.rides || '[]'); } catch(e) { return []; } }
 function save(){ try { localStorage.rides = JSON.stringify(rides); } catch(e) {} }
@@ -83,41 +82,24 @@ async function api(p){
 }
 
 async function getStops(){
-  try { const c = JSON.parse(localStorage.stops || 'null'); if (c && Date.now() - c.t < 6048e5) return c.s; } catch(e) {}
-  const j = await api('/stops?filter[route]=' + ROUTES + '&fields[stop]=name,latitude,longitude');
-  const s = j.data.map(x => ({id:x.id, n:x.attributes.name, la:x.attributes.latitude, lo:x.attributes.longitude}));
-  try { localStorage.stops = JSON.stringify({t:Date.now(), s}); } catch(e) {}
-  return s;
+  try { const c = JSON.parse(localStorage.stops2 || 'null'); if (c && Date.now() - c.t < 6048e5) return c; } catch(e) {}
+  const get = async r => (await api('/stops?filter[route]=' + r + '&fields[stop]=name')).data
+    .map(x => ({id:x.id, n:x.attributes.name})).sort((a,b) => a.n.localeCompare(b.n));
+  const c = {t:Date.now(), r:await get('Red'), g:await get('Green-B,Green-C,Green-D,Green-E')};
+  try { localStorage.stops2 = JSON.stringify(c); } catch(e) {}
+  return c;
 }
 
-function dist(a,b,c,d){
-  const r = Math.PI/180, x = (d-b)*r*Math.cos((a+c)/2*r), y = (c-a)*r;
-  return Math.sqrt(x*x + y*y) * 6371000;
-}
-
-function nearest(la,lo){
-  const ds = stops.map(s => ({s, d:dist(la,lo,s.la,s.lo)})).sort((a,b) => a.d - b.d);
-  const n = ds[0].d;
-  const fav = ds.filter(x => x.d <= n*1.3 && x.d - n < 200 && FAV.includes(x.s.id))
-                .sort((a,b) => FAV.indexOf(a.s.id) - FAV.indexOf(b.s.id));
-  return (fav[0] || ds[0]).s;
-}
-
-function locate(){
-  $('st').textContent = 'Locating…';
-  if (!navigator.geolocation) return picker('No location');
-  navigator.geolocation.getCurrentPosition(p => {
-    const {latitude:la, longitude:lo} = p.coords;
-    if (HOME && dist(la,lo,HOME.lat,HOME.lon) < 150) { showLog(); return; }
-    setStop(nearest(la,lo));
-  }, () => picker('Location off'), {timeout:8000, maximumAge:60000});
-}
-
-function picker(why){
-  view = 'pick'; stop = null;
-  $('st').textContent = why || 'Pick a stop';
-  $('main').innerHTML = FAV.map(id => stops.find(s => s.id === id)).filter(Boolean)
-    .map(s => `<button data-s="${s.id}">${s.n}</button>`).join('') + '<button data-loc="1">Use my location</button>';
+function picker(){
+  view = 'pick';
+  $('st').textContent = 'Stops';
+  $('logBtn').textContent = 'Ride log';
+  const b = s => `<button data-s="${s.id}">${s.n}</button>`;
+  const other = l => l.filter(s => !FAV.includes(s.id)).map(b).join('');
+  $('main').innerHTML = FAV.map(id => stops.find(s => s.id === id)).filter(Boolean).map(b).join('')
+    + '<div class="sec R">Red Line</div>' + other(lines.r)
+    + '<div class="sec G">Green Line</div>' + other(lines.g);
+  scrollTo(0, 0);
 }
 
 function setStop(s){
@@ -125,6 +107,7 @@ function setStop(s){
   $('st').textContent = s.n + ' ▾';
   $('main').innerHTML = '<div class="msg">Loading…</div>';
   try { history.replaceState(null, '', '?stop=' + s.id); } catch(e) {}
+  scrollTo(0, 0);
   refresh();
 }
 
@@ -217,28 +200,33 @@ function undo(){
 
 function showLog(){
   view = 'log';
-  $('st').textContent = 'Ride log ▾';
-  $('logBtn').textContent = 'Trains';
+  $('st').textContent = 'Ride log';
+  $('logBtn').textContent = stop ? 'Trains' : 'Stops';
   const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
-  $('main').innerHTML = rides.length
-    ? `<div class="msg">${rides.filter(x => !x.ok).length} to check off</div>` + rides.map(x =>
-      `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car f${x.c.slice(0,2)}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`).join('')
-    : '<div class="msg">Nothing logged yet. Tap a car number on the trains screen.</div>';
+  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car f${x.c.slice(0,2)}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`;
+  const open = rides.filter(x => !x.ok), doneN = rides.length - open.length;
+  $('main').innerHTML = (open.length ? open.map(row).join('') : '<div class="msg">All checked off.</div>')
+    + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '');
 }
 
 function showTrains(){
   $('logBtn').textContent = 'Ride log';
-  if (stop) setStop(stop); else locate();
+  if (stop) setStop(stop); else picker();
 }
 
 document.addEventListener('click', ev => {
   const t = ev.target;
   const car = t.closest('.car[data-c]'); if (car) return logCar(car.dataset.c);
-  const row = t.closest('.lr'); if (row) { const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r); return showLog(); }
+  const row = t.closest('.lr'); if (row) {
+    const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r);
+    row.querySelector('.ck').classList.toggle('on', r.ok);
+    clearTimeout(ckT); ckT = setTimeout(() => { if (view === 'log') showLog(); }, 1500);
+    return;
+  }
+  if (t.id === 'doneBtn') { showDone = !showDone; return showLog(); }
   const s = t.closest('[data-s]'); if (s) return setStop(stops.find(x => x.id === s.dataset.s));
-  if (t.closest('[data-loc]')) return locate();
-  if (t.id === 'st') return view === 'log' ? showTrains() : picker();
-  if (t.id === 'logBtn') return view === 'log' ? showTrains() : showLog();
+  if (t.id === 'st') return view === 'trains' ? picker() : null;
+  if (t.id === 'logBtn') return view === 'log' ? (stop ? showTrains() : picker()) : showLog();
   if (t.id === 'undo') return undo();
 });
 
@@ -247,11 +235,11 @@ setInterval(() => { if (view === 'trains' && got) render(); }, 15000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 
 (async () => {
-  try { stops = await getStops(); } catch(e) { $('main').innerHTML = '<div class="msg">Can’t reach the MBTA right now.</div>'; return; }
   const q = new URLSearchParams(location.search);
   if (q.get('log')) return showLog();
+  try { lines = await getStops(); stops = lines.r.concat(lines.g); } catch(e) { $('main').innerHTML = '<div class="msg">Can’t reach the MBTA right now.</div>'; return; }
   const s = q.get('stop') && stops.find(x => x.id === q.get('stop'));
-  if (s) setStop(s); else locate();
+  if (s) setStop(s); else picker();
 })();
 </script>
 </body>
