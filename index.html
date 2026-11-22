@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="disabled-adaptations" content="watch">
+<title>Cars</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:#fff;font:13px -apple-system,system-ui,sans-serif;padding:2px 6px 64px;-webkit-user-select:none;user-select:none}
+button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;padding:8px 10px;width:100%;margin-top:6px;text-align:left}
+#hdr{display:flex;justify-content:space-between;align-items:center;padding:2px}
+#st{background:none;padding:0;margin:0;width:auto;color:#aaa;font-size:12px}
+#age{font-size:11px;color:#666}
+.sec{font-size:11px;margin-top:8px;padding:0 2px 2px;border-bottom:.5px solid #333}
+.R{color:#F09595}.G{color:#97C459}
+.tr{padding:5px 0 4px}
+.hd{display:flex;justify-content:space-between;padding:0 2px 1px}
+.hd span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:6px}
+.hd b{font-weight:600;white-space:nowrap}
+.soon{color:#FFD60A}
+.ln{display:flex;gap:3px;margin-top:3px}
+.e{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;line-height:10px;color:#8e8e93;text-align:center;width:10px;flex-shrink:0}
+.e.r{transform:none}
+.cs{display:flex;gap:3px;flex:1;min-width:0}
+.car{flex:1;height:28px;border-radius:4px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.car span{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-variant-numeric:tabular-nums}
+.car i,.car u{display:block;height:0;flex-shrink:0}
+.f15,.f16{background:#C9CED4;color:#1F3A7A}.f15 i,.f16 i{height:4px;background:#1F3A7A}.f15 u,.f16 u{height:4px;background:#D4A62A}
+.f17{background:#fff;color:#111}.f17 i{height:3px;background:#A9AFB6}.f17 u{height:10px;background:#DA291C}
+.f18{background:#4A4F56;color:#fff}.f18 u{height:4px;background:#DA291C}
+.f19{background:#A9AFB6;color:#1E2227}.f19 i{height:4px;background:#DA291C}
+.f36,.f37{background:#D2B98C;color:#4A3818}
+.f38{background:#2BB5B0;color:#062F2D}
+.f39{background:#1F5A36;color:#fff}
+.car.got{opacity:.45}
+.none{font-size:11px;color:#666;padding:2px}
+.msg{color:#888;font-size:12px;padding:8px 2px}
+#toast{position:fixed;left:6px;right:6px;bottom:8px;background:#2c2c2e;border-radius:14px;padding:6px 6px 6px 12px;display:none;align-items:center;justify-content:space-between}
+#toast button{width:auto;margin:0;background:#FFD60A;color:#2a2200;padding:4px 12px}
+.lr{display:flex;align-items:center;gap:8px;padding:6px 2px;border-top:.5px solid #2a2a2a}
+.ck{width:20px;height:20px;border-radius:50%;border:1.5px solid #555;flex-shrink:0}
+.ck.on{background:#30D158;border-color:#30D158}
+.lr .car{flex:0 0 52px}
+.lr small{color:#888;font-size:11px;margin-left:auto;text-align:right}
+</style>
+</head>
+<body>
+<div id="hdr"><button id="st">Locating…</button><span id="age"></span></div>
+<div id="main"></div>
+<button id="logBtn">Ride log</button>
+<div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
+<script>
+// ===== Settings =====
+const KEY = '';     // free MBTA API key (api-v3.mbta.com) – optional but recommended
+const SYNC = '';    // Google Apps Script web app URL – optional, sends your log to a Google Sheet
+const HOME = null;  // e.g. {lat:42.34, lon:-71.14} – opens the ride log when you're within ~150 m. This file is public!
+// ====================
+
+const API = 'https://api-v3.mbta.com';
+const ROUTES = 'Red,Green-B,Green-C,Green-D,Green-E';
+const FAV = ['place-pktrm','place-harsq','place-chmnl','place-dwnxg','place-tapst','place-bcnfd'];
+const GROUPS = [
+  {r:['Red'],d:0,c:'R',l:'Red · southbound'},
+  {r:['Red'],d:1,c:'R',l:'Red · northbound'},
+  {r:['Green-D'],d:0,c:'G'},
+  {r:['Green-C'],d:0,c:'G'},
+  {r:['Green-D','Green-E'],d:1,c:'G'},
+  {r:['Green-B','Green-E'],d:0,c:'G'},
+  {r:['Green-B','Green-C'],d:1,c:'G'}
+];
+const $ = id => document.getElementById(id);
+let stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains';
+
+function load(){ try { return JSON.parse(localStorage.rides || '[]'); } catch(e) { return []; } }
+function save(){ try { localStorage.rides = JSON.stringify(rides); } catch(e) {} }
+
+async function api(p){
+  const r = await fetch(API + p + (KEY ? '&api_key=' + KEY : ''));
+  if (!r.ok) throw Error(r.status);
+  return r.json();
+}
+
+async function getStops(){
+  try { const c = JSON.parse(localStorage.stops || 'null'); if (c && Date.now() - c.t < 6048e5) return c.s; } catch(e) {}
+  const j = await api('/stops?filter[route]=' + ROUTES + '&fields[stop]=name,latitude,longitude');
+  const s = j.data.map(x => ({id:x.id, n:x.attributes.name, la:x.attributes.latitude, lo:x.attributes.longitude}));
+  try { localStorage.stops = JSON.stringify({t:Date.now(), s}); } catch(e) {}
+  return s;
+}
+
+function dist(a,b,c,d){
+  const r = Math.PI/180, x = (d-b)*r*Math.cos((a+c)/2*r), y = (c-a)*r;
+  return Math.sqrt(x*x + y*y) * 6371000;
+}
+
+function nearest(la,lo){
+  const ds = stops.map(s => ({s, d:dist(la,lo,s.la,s.lo)})).sort((a,b) => a.d - b.d);
+  const n = ds[0].d;
+  const fav = ds.filter(x => x.d <= n*1.3 && x.d - n < 200 && FAV.includes(x.s.id))
+                .sort((a,b) => FAV.indexOf(a.s.id) - FAV.indexOf(b.s.id));
+  return (fav[0] || ds[0]).s;
+}
+
+function locate(){
+  $('st').textContent = 'Locating…';
+  if (!navigator.geolocation) return picker('No location');
+  navigator.geolocation.getCurrentPosition(p => {
+    const {latitude:la, longitude:lo} = p.coords;
+    if (HOME && dist(la,lo,HOME.lat,HOME.lon) < 150) { showLog(); return; }
+    setStop(nearest(la,lo));
+  }, () => picker('Location off'), {timeout:8000, maximumAge:60000});
+}
+
+function picker(why){
+  view = 'pick'; stop = null;
+  $('st').textContent = why || 'Pick a stop';
+  $('main').innerHTML = FAV.map(id => stops.find(s => s.id === id)).filter(Boolean)
+    .map(s => `<button data-s="${s.id}">${s.n}</button>`).join('') + '<button data-loc="1">Use my location</button>';
+}
+
+function setStop(s){
+  stop = s; view = 'trains';
+  $('st').textContent = s.n + ' ▾';
+  $('main').innerHTML = '<div class="msg">Loading…</div>';
+  try { history.replaceState(null, '', '?stop=' + s.id); } catch(e) {}
+  refresh();
+}
+
+function carsOf(v){
+  const a = v.attributes;
+  const c = (a.carriages || []).map(x => x.label).filter(Boolean);
+  return c.length ? c : (a.label || '').split('-').filter(Boolean);
+}
+
+async function refresh(){
+  if (!stop || view !== 'trains') return;
+  try {
+    const j = await api(`/predictions?filter[stop]=${stop.id}&filter[route]=${ROUTES}&include=vehicle,trip&fields[vehicle]=label,carriages&fields[trip]=headsign`);
+    const inc = {};
+    (j.included || []).forEach(x => inc[x.type + x.id] = x);
+    const now = Date.now();
+    last = j.data.map(p => {
+      const a = p.attributes, rl = p.relationships;
+      const t = Date.parse(a.arrival_time || a.departure_time);
+      const v = rl.vehicle.data && inc['vehicle' + rl.vehicle.data.id];
+      const tr = rl.trip.data && inc['trip' + rl.trip.data.id];
+      return {r:rl.route.data.id, d:a.direction_id, t, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
+    }).filter(x => !isNaN(x.t) && x.t - now > -60000);
+    got = now;
+    render();
+  } catch(e) {
+    $('age').textContent = 'offline';
+  }
+}
+
+function when(t){
+  const s = (t - Date.now()) / 1000;
+  return s <= 30 ? 'Now' : s < 90 ? '1 min' : Math.round(s/60) + ' min';
+}
+
+const done = c => rides.some(x => x.c === c);
+const carH = c => `<div class="car f${c.slice(0,2)}${done(c) ? ' got' : ''}" data-c="${c}"><i></i><span>${c}</span><u></u></div>`;
+
+function consist(cars){
+  if (!cars.length) return '<div class="none">Cars not assigned yet</div>';
+  if (cars.length === 1 && /^1[5-9]/.test(cars[0])) return `<div class="ln"><div class="e">FWD</div><div class="cs">${carH(cars[0])}<div class="none" style="flex:2;align-self:center">lead car only</div></div></div>`;
+  const L = [];
+  for (let i = 0; i < cars.length; i += 3) L.push(cars.slice(i, i+3));
+  return L.map((l,i) => `<div class="ln"><div class="e">${i ? 'MID' : 'FWD'}</div><div class="cs">${l.map(carH).join('')}</div><div class="e r">${i === L.length-1 ? 'AFT' : 'MID'}</div></div>`).join('');
+}
+
+function render(){
+  if (view !== 'trains') return;
+  let h = '';
+  for (const g of GROUPS) {
+    const it = last.filter(x => g.r.includes(x.r) && x.d === g.d).sort((a,b) => a.t - b.t).slice(0, 2);
+    if (!it.length) continue;
+    const lab = g.l || [...new Set(it.map(x => x.r.slice(-1)))].sort().join(' and ') + (g.d ? ' · inbound' : ' · outbound');
+    h += `<div class="sec ${g.c}">${lab}</div>`;
+    for (const x of it) {
+      const soon = x.t - Date.now() < 90000;
+      const head = (x.r === 'Red' ? '' : x.r.slice(-1) + ' · ') + x.h;
+      h += `<div class="tr"><div class="hd"><span>${head}</span><b class="${soon ? 'soon' : ''}">${when(x.t)}</b></div>${consist(x.cars)}</div>`;
+    }
+  }
+  $('main').innerHTML = h || '<div class="msg">No trains predicted right now.</div>';
+  $('age').textContent = '';
+}
+
+function sync(a, e){
+  if (!SYNC) return;
+  fetch(SYNC, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(Object.assign({a}, e))}).catch(() => {});
+}
+
+function toast(m, u){
+  $('tmsg').textContent = m;
+  $('undo').style.display = u ? '' : 'none';
+  $('toast').style.display = 'flex';
+  clearTimeout(tT);
+  tT = setTimeout(() => { $('toast').style.display = 'none'; lastAdd = null; }, 5000);
+}
+
+function logCar(c){
+  if (done(c)) { toast(c + ' already logged'); return; }
+  lastAdd = {id:'r' + Date.now(), c, s:stop ? stop.n : '', t:Date.now(), ok:false};
+  rides.unshift(lastAdd); save(); sync('add', lastAdd);
+  toast('Logged ' + c, true); render();
+}
+
+function undo(){
+  if (!lastAdd) return;
+  rides = rides.filter(x => x.id !== lastAdd.id); save(); sync('remove', lastAdd);
+  lastAdd = null; $('toast').style.display = 'none'; render();
+}
+
+function showLog(){
+  view = 'log';
+  $('st').textContent = 'Ride log ▾';
+  $('logBtn').textContent = 'Trains';
+  const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
+  $('main').innerHTML = rides.length
+    ? `<div class="msg">${rides.filter(x => !x.ok).length} to check off</div>` + rides.map(x =>
+      `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car f${x.c.slice(0,2)}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`).join('')
+    : '<div class="msg">Nothing logged yet. Tap a car number on the trains screen.</div>';
+}
+
+function showTrains(){
+  $('logBtn').textContent = 'Ride log';
+  if (stop) setStop(stop); else locate();
+}
+
+document.addEventListener('click', ev => {
+  const t = ev.target;
+  const car = t.closest('.car[data-c]'); if (car) return logCar(car.dataset.c);
+  const row = t.closest('.lr'); if (row) { const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r); return showLog(); }
+  const s = t.closest('[data-s]'); if (s) return setStop(stops.find(x => x.id === s.dataset.s));
+  if (t.closest('[data-loc]')) return locate();
+  if (t.id === 'st') return view === 'log' ? showTrains() : picker();
+  if (t.id === 'logBtn') return view === 'log' ? showTrains() : showLog();
+  if (t.id === 'undo') return undo();
+});
+
+setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 20000);
+setInterval(() => { if (view === 'trains' && got) render(); }, 15000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+
+(async () => {
+  try { stops = await getStops(); } catch(e) { $('main').innerHTML = '<div class="msg">Can’t reach the MBTA right now.</div>'; return; }
+  const q = new URLSearchParams(location.search);
+  if (q.get('log')) return showLog();
+  const s = q.get('stop') && stops.find(x => x.id === q.get('stop'));
+  if (s) setStop(s); else locate();
+})();
+</script>
+</body>
+</html>
