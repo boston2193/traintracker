@@ -24,7 +24,7 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .e{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;line-height:10px;color:#8e8e93;text-align:center;width:10px;flex-shrink:0}
 .e.r{transform:none}
 .cs{display:flex;gap:3px;flex:1;min-width:0}
-.car{flex:1;height:28px;border-radius:4px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.car{position:relative;flex:1;height:28px;border-radius:4px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 .car span{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-variant-numeric:tabular-nums}
 .car i,.car u{display:block;height:0;flex-shrink:0}
 .f15,.f16{background:#C9CED4;color:#1F3A7A}.f15 i,.f16 i{height:4px;background:#1F3A7A}.f15 u,.f16 u{height:4px;background:#D4A62A}
@@ -41,6 +41,22 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 #nav button{margin:0;text-align:center;background:#2c2c2e;padding:9px 4px}
 #backBtn{flex:1}#logBtn{flex:1}
 .key .car{height:26px;margin-top:4px}.key .car span{justify-content:flex-start;padding-left:8px}
+.O{color:#FFB366}
+.grp.O{color:#FFB366}
+.fO0,.fO1,.fO2,.fO3{color:#111}.fO0 i,.fO1 i,.fO2 i,.fO3 i{height:3px;background:#ED8B00}
+.fO0{background:#8E8E93}.fO1{background:#30D158}.fO2{background:#FFD60A}.fO3{background:#FF453A;color:#fff}
+.tg{display:flex;justify-content:space-between}.tg::after{content:"Off";color:#666}.tg.on::after{content:"On";color:#30D158}
+.fr{display:flex;align-items:center;gap:6px;margin-top:6px;background:#1c1c1e;border-radius:12px;padding:4px 4px 4px 10px}
+.fr span{flex:1}.fr button{width:auto;margin:0;padding:4px 10px;background:#3a3a3c}
+.oc{position:absolute;top:2px;right:2px;width:6px;height:6px;border-radius:50%;box-shadow:0 0 0 1px #000}
+.o1{background:#30D158}.o2{background:#FFD60A}.o3{background:#FF453A}
+.lat{display:flex;align-items:center;gap:6px;padding:3px 2px;font-size:12px;color:#aaa}
+.lat span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.mini{display:flex;gap:1px;flex:0 0 auto}.mini i{display:block;width:7px;height:11px;border-radius:1px}
+.al{background:#3a2a00;color:#FFD60A;border-radius:10px;padding:5px 8px;margin-top:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.al.open{white-space:normal}
+.dim{opacity:.5}
+.hd.tap span:first-child::after{content:" ›";color:#666}
 .none{font-size:11px;color:#666;padding:2px}
 .msg{color:#888;font-size:12px;padding:8px 2px}
 #toast{position:fixed;left:6px;right:6px;bottom:52px;background:#2c2c2e;border-radius:14px;padding:6px 6px 6px 12px;display:none;align-items:center;justify-content:space-between}
@@ -64,8 +80,14 @@ const SYNC = '';    // Google Apps Script web app URL – optional, sends your l
 // ====================
 
 const API = 'https://api-v3.mbta.com';
-const ROUTES = 'Red,Green-B,Green-C,Green-D,Green-E';
-const FAV = ['place-pktrm','place-harsq','place-chmnl','place-dwnxg','place-tapst','place-bcnfd'];
+const ALLR = ['Red','Green-B','Green-C','Green-D','Green-E','Orange'];
+const DEF = {fav:['place-pktrm','place-harsq','place-chmnl','place-dwnxg','place-tapst','place-bcnfd','place-sstat','place-kencl']};
+let S = loadS();
+function loadS(){ const d = JSON.parse(JSON.stringify(DEF)); try { d.fav = JSON.parse(localStorage.settings || '{}').fav || d.fav; } catch(e) {} return d; }
+function saveS(){ try { localStorage.settings = JSON.stringify(S); } catch(e) {} }
+const routes = () => ALLR;
+const lineOf = r => r.startsWith('Green') ? 'Green' : r;
+
 const GROUPS = [
   {r:['Red'],d:0,c:'R',l:'Red · southbound'},
   {r:['Red'],d:1,c:'R',l:'Red · northbound'},
@@ -73,10 +95,12 @@ const GROUPS = [
   {r:['Green-C'],d:0,c:'G'},
   {r:['Green-D','Green-E'],d:1,c:'G'},
   {r:['Green-B','Green-E'],d:0,c:'G'},
-  {r:['Green-B','Green-C'],d:1,c:'G'}
+  {r:['Green-B','Green-C'],d:1,c:'G'},
+  {r:['Orange'],d:0,c:'O',l:'Orange · southbound'},
+  {r:['Orange'],d:1,c:'O',l:'Orange · northbound'}
 ];
 const $ = id => document.getElementById(id);
-let stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains', showDone = false, ckT = null;
+let ride = null, fStop = null, AL = {id:'', t:0, list:[]}, alOpen = -1, okT = 0, stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains', showDone = false, ckT = null;
 
 function load(){ try { return JSON.parse(localStorage.rides || '[]'); } catch(e) { return []; } }
 function save(){ try { localStorage.rides = JSON.stringify(rides); } catch(e) {} }
@@ -87,69 +111,91 @@ async function api(p){
   return r.json();
 }
 
-const QUICK = FAV.concat(['place-sstat','place-kencl']);
 const GRP = [
-  ['Red downtown','R',null,'Alewife,Davis,Porter,Harvard,Central,Kendall/MIT,Charles/MGH,Park Street,Downtown Crossing,South Station,Broadway,Andrew,JFK/UMass'],
-  ['Green downtown','G',null,'Medford/Tufts,Ball Square,Magoun Square,Gilman Square,East Somerville,Union Square,Lechmere,Science Park/West End,North Station,Haymarket,Government Center,Park Street,Boylston,Arlington,Copley,Hynes Convention Center,Kenmore'],
-  ['C branch','G','Green-C','Saint Marys Street,Hawes Street,Kent Street,Saint Paul Street,Coolidge Corner,Summit Avenue,Brandon Hall,Fairbanks Street,Washington Square,Tappan Street,Dean Road,Englewood Avenue,Cleveland Circle'],
-  ['D branch','G','Green-D','Fenway,Longwood,Brookline Village,Brookline Hills,Beaconsfield,Reservoir,Chestnut Hill,Newton Centre,Newton Highlands,Eliot,Waban,Woodland,Riverside'],
-  ['Ashmont','R',null,'Savin Hill,Fields Corner,Shawmut,Ashmont'],
-  ['Braintree','R',null,'North Quincy,Wollaston,Quincy Center,Quincy Adams,Braintree'],
-  ['B branch','G','Green-B','Blandford Street,Boston University East,Boston University Central,Amory Street,Babcock Street,Packards Corner,Harvard Avenue,Griggs Street,Allston Street,Warren Street,Washington Street,Sutherland Road,Chiswick Road,Chestnut Hill Avenue,South Street,Boston College'],
-  ['E branch','G','Green-E','Prudential,Symphony,Northeastern University,Museum of Fine Arts,Longwood Medical Area,Brigham Circle,Fenwood Road,Mission Park,Riverway,Back of the Hill,Heath Street']
-].map(([n,c,r,l]) => ({n, c, r, order:l.split(',').map(norm), list:[]}));
-let openG = -1, keyOpen = false;
-const KEYS = [['15','1500s / 1600s'],['17','1700s'],['18','1800s'],['19','1900s'],['36','Type 7'],['38','Type 8'],['39','Type 9']];
-const keyH = () => `<button class="grp" data-key="1">${keyOpen ? '▾' : '▸'} Color key</button>` + (keyOpen ? '<div class="key">' + KEYS.map(([f,n]) => `<div class="car f${f}"><i></i><span>${n}</span><u></u></div>`).join('') + '</div>' : '');
-const TERM = {'place-alfcl':['Red',1],'place-asmnl':['Red',0],'place-brntn':['Red',0],'place-lake':['Green-B',0],'place-clmnl':['Green-C',0],'place-river':['Green-D',0],'place-hsmnl':['Green-E',0],'place-mdftf':['Green-E',1],'place-unsqu':['Green-D',1]};
+  ['Red downtown','Red','R',null,'Alewife,Davis,Porter,Harvard,Central,Kendall/MIT,Charles/MGH,Park Street,Downtown Crossing,South Station,Broadway,Andrew,JFK/UMass'],
+  ['Green downtown','Green','G',null,'Medford/Tufts,Ball Square,Magoun Square,Gilman Square,East Somerville,Union Square,Lechmere,Science Park/West End,North Station,Haymarket,Government Center,Park Street,Boylston,Arlington,Copley,Hynes Convention Center,Kenmore'],
+  ['C branch','Green','G','Green-C','Saint Marys Street,Hawes Street,Kent Street,Saint Paul Street,Coolidge Corner,Summit Avenue,Brandon Hall,Fairbanks Street,Washington Square,Tappan Street,Dean Road,Englewood Avenue,Cleveland Circle'],
+  ['D branch','Green','G','Green-D','Fenway,Longwood,Brookline Village,Brookline Hills,Beaconsfield,Reservoir,Chestnut Hill,Newton Centre,Newton Highlands,Eliot,Waban,Woodland,Riverside'],
+  ['Ashmont','Red','R',null,'Savin Hill,Fields Corner,Shawmut,Ashmont'],
+  ['Braintree','Red','R',null,'North Quincy,Wollaston,Quincy Center,Quincy Adams,Braintree'],
+  ['B branch','Green','G','Green-B','Blandford Street,Boston University East,Boston University Central,Amory Street,Babcock Street,Packards Corner,Harvard Avenue,Griggs Street,Allston Street,Warren Street,Washington Street,Sutherland Road,Chiswick Road,Chestnut Hill Avenue,South Street,Boston College'],
+  ['E branch','Green','G','Green-E','Prudential,Symphony,Northeastern University,Museum of Fine Arts,Longwood Medical Area,Brigham Circle,Fenwood Road,Mission Park,Riverway,Back of the Hill,Heath Street'],
+  ['Orange Line','Orange','O',null,'North Station,Haymarket,State,Downtown Crossing,Chinatown,Tufts Medical Center,Back Bay,Massachusetts Avenue,Ruggles,Roxbury Crossing,Jackson Square,Stony Brook,Green Street,Forest Hills,Community College,Sullivan Square,Assembly,Wellington,Malden Center,Oak Grove']
+].map(([n,L,c,r,l]) => ({n, L, c, r, order:l.split(',').map(norm), list:[]}));
+let openG = -1, keyOpen = false, armed = false, armT = null;
+const KEYS = [['f15','1500s / 1600s','Red'],['f17','1700s','Red'],['f18','1800s','Red'],['f19','1900s','Red'],['f36','Type 7','Green'],['f38','Type 8','Green'],['f39','Type 9','Green'],['fO1','Orange · roomy'],['fO2','Orange · getting full'],['fO3','Orange · packed'],['fO0','Orange · no data']];
+const keyH = () => `<button class="grp" data-key="1">${keyOpen ? '▾' : '▸'} Color key</button>` + (keyOpen ? '<div class="key">' + KEYS.map(([f,n]) => `<div class="car ${f}"><i></i><span>${n}</span><u></u></div>`).join('') + '</div>' : '');
+const TERM = {'place-alfcl':[['Red',1]],'place-asmnl':[['Red',0]],'place-brntn':[['Red',0]],'place-lake':[['Green-B',0]],'place-clmnl':[['Green-C',0]],'place-river':[['Green-D',0]],'place-hsmnl':[['Green-E',0]],'place-mdftf':[['Green-E',1]],'place-unsqu':[['Green-D',1]],'place-ogmnl':[['Orange',1]],'place-forhl':[['Orange',0]]};
+const isTerm = (id,r,d) => (TERM[id] || []).some(x => x[0] === r && x[1] === d);
 function nav(){
   $('backBtn').style.display = view === 'pick' ? 'none' : '';
+  $('backBtn').textContent = view === 'addfav' ? '‹ Settings' : view === 'ride' ? '‹ Station' : view === 'find2' ? '‹ Where' : '‹ Stops';
+  $('main').classList.remove('dim'); okT = 0; $('age').textContent = '';
   $('logBtn').style.display = '';
   $('logBtn').textContent = view === 'log' ? (stop ? 'Trains' : 'Stops') : 'Ride log';
   if (view === 'log' && !stop) $('logBtn').style.display = 'none';
 }
-const RDT = GRP[0], GDT = GRP[1];
 
 function norm(s){ return s.toLowerCase().replace(/^st\.? /,'saint ').replace(/[^a-z0-9]/g,''); }
 
 async function getStops(){
-  let c = null;
-  try { c = JSON.parse(localStorage.stops3 || 'null'); } catch(e) {}
-  if (!c || Date.now() - c.t > 6048e5) {
-    const rs = ['Red','Green-B','Green-C','Green-D','Green-E'];
-    const res = await Promise.all(rs.map(r => api('/stops?filter[route]=' + r + '&fields[stop]=name')));
-    const m = {};
-    res.forEach((j,i) => j.data.forEach(x => { (m[x.id] = m[x.id] || {id:x.id, n:x.attributes.name, r:[]}).r.push(rs[i]); }));
-    c = {t:Date.now(), s:Object.values(m)};
-    try { localStorage.stops3 = JSON.stringify(c); } catch(e) {}
-  }
+  let c = {};
+  try { c = JSON.parse(localStorage.stops4 || '{}'); } catch(e) {}
+  const need = routes().filter(r => !c[r] || Date.now() - c[r].t > 6048e5);
+  const res = await Promise.all(need.map(r => api('/stops?filter[route]=' + r + '&fields[stop]=name,latitude,longitude')));
+  res.forEach((j,i) => c[need[i]] = {t:Date.now(), s:j.data.map(x => ({id:x.id, n:x.attributes.name, la:x.attributes.latitude, lo:x.attributes.longitude}))});
+  if (need.length) try { localStorage.stops4 = JSON.stringify(c); } catch(e) {}
+  const m = {};
+  routes().forEach(r => c[r].s.forEach(x => { (m[x.id] = m[x.id] || Object.assign({r:[]}, x)).r.push(r); }));
+  const all = Object.values(m);
   GRP.forEach(g => g.list = []);
-  for (const s of c.s) {
+  for (const s of all) {
     const k = norm(s.n);
-    let g = GRP.find(g => g.order.includes(k) && (g.c === 'R') === s.r.includes('Red'));
-    if (!g) g = s.r.includes('Red') ? RDT : (GRP.find(g => g.r && s.r.includes(g.r)) || GDT);
-    g.list.push(s);
-    if (s.r.includes('Red') && s.r.length > 1 && g !== GDT) GDT.list.push(s);
+    for (const L of [...new Set(s.r.map(lineOf))]) {
+      const gs = GRP.filter(g => g.L === L);
+      const g = gs.find(g => g.order.includes(k)) || (L === 'Green' && gs.find(g => g.r && s.r.includes(g.r))) || gs[0];
+      g.list.push(s);
+    }
   }
   GRP.forEach(g => g.list.sort((a,b) => {
     const i = g.order.indexOf(norm(a.n)), j = g.order.indexOf(norm(b.n));
     return (i < 0 ? 999 : i) - (j < 0 ? 999 : j) || a.n.localeCompare(b.n);
   }));
-  return c.s;
+  return all;
 }
 
-function picker(){
-  view = 'pick';
-  $('st').textContent = 'Stops';
+function picker(adding){
+  view = adding ? 'addfav' : 'pick';
+  $('st').textContent = adding ? 'Add a quick stop' : 'Stops';
   nav();
   const b = (s,k) => `<button data-s="${s.id}"${k ? ' class="kid"' : ''}>${s.n}</button>`;
-  $('main').innerHTML = QUICK.map(id => stops.find(s => s.id === id)).filter(Boolean).map(s => b(s)).join('')
-    + GRP.map((g,i) => `<button class="grp ${g.c}" data-g="${i}">${openG === i ? '▾' : '▸'} ${g.n}</button>`
-      + (openG === i ? g.list.map(s => b(s,1)).join('') : '')).join('') + keyH();
+  $('main').innerHTML = (adding ? '' : S.fav.map(id => stops.find(s => s.id === id)).filter(Boolean).map(s => b(s)).join(''))
+    + GRP.map((g,i) => g.list.length ? `<button class="grp ${g.c}" data-g="${i}">${openG === i ? '▾' : '▸'} ${g.n}</button>`
+      + (openG === i ? g.list.map(s => b(s,1)).join('') : '') : '').join('')
+    + (adding ? '' : '<button id="findBtn">Find 1500/1600s</button>' + keyH() + '<button id="setBtn">Settings</button>');
+}
+
+function settings(){
+  view = 'set';
+  $('st').textContent = 'Settings';
+  nav();
+  $('main').innerHTML = ''
+    + '<div class="sec">Quick stops</div>'
+    + (S.fav.map(id => { const s = stops.find(x => x.id === id); return s ? `<div class="fr"><span>${s.n}</span><button data-unfav="${id}">✕</button></div>` : ''; }).join('') || '<div class="none">No quick stops</div>')
+    + '<button data-addfav="1">+ Add a quick stop</button>'
+    + `<button data-reset="1">${armed ? 'Tap again to reset everything' : 'Reset all settings'}</button>`
+    + '<div class="none">Back to the original quick stops. Your ride log is kept.</div>';
+}
+
+async function changed(){
+  try { stops = await getStops(); } catch(e) { toast('Can’t reach the MBTA'); }
+  if (stop && !stops.find(x => x.id === stop.id)) stop = null;
+  else if (stop) stop = stops.find(x => x.id === stop.id);
+  settings();
 }
 
 function setStop(s){
-  stop = s; view = 'trains'; nav();
+  stop = s; view = 'trains'; alOpen = -1; nav();
   $('st').textContent = s.n;
   $('main').innerHTML = '<div class="msg">Loading…</div>';
   try { history.replaceState(null, '', '?stop=' + s.id); } catch(e) {}
@@ -157,31 +203,65 @@ function setStop(s){
   refresh();
 }
 
+const OCC = {EMPTY:1, MANY_SEATS_AVAILABLE:1, FEW_SEATS_AVAILABLE:2, STANDING_ROOM_ONLY:3, CRUSHED_STANDING_ROOM_ONLY:3, FULL:3};
 function carsOf(v){
   const a = v.attributes;
-  const c = (a.carriages || []).map(x => x.label).filter(Boolean);
-  return c.length ? c : (a.label || '').split('-').filter(Boolean);
+  const c = (a.carriages || []).filter(x => x.label).map(x => ({n:x.label, o:OCC[x.occupancy_status] || 0}));
+  return c.length ? c : (a.label || '').split('-').filter(Boolean).map(n => ({n, o:0}));
+}
+
+function parsePred(j){
+  const inc = {};
+  (j.included || []).forEach(x => inc[x.type + x.id] = x);
+  const now = Date.now();
+  return j.data.map(p => {
+    const a = p.attributes, rl = p.relationships;
+    const t = Date.parse(a.arrival_time || a.departure_time);
+    const vid = rl.vehicle.data && rl.vehicle.data.id;
+    const v = vid && inc['vehicle' + vid];
+    const tr = rl.trip.data && inc['trip' + rl.trip.data.id];
+    return {r:rl.route.data.id, d:a.direction_id, t, vid, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
+  }).filter(x => !isNaN(x.t) && x.t - now > -60000);
+}
+const PQ = '&include=vehicle,trip&fields[vehicle]=label,carriages&fields[trip]=headsign';
+
+function ok(){ okT = Date.now(); $('main').classList.remove('dim'); age(); }
+function fail(){ $('main').classList.add('dim'); age(true); }
+function age(off){
+  const s = okT ? Math.round((Date.now() - okT) / 1000) : 0;
+  const t = s < 90 ? s + 's' : Math.round(s/60) + 'm';
+  $('age').textContent = off ? 'offline' + (s >= 30 ? ' · ' + t : '') : s >= 30 ? t + ' old' : '';
 }
 
 async function refresh(){
-  if (!stop || view !== 'trains') return;
+  if (view === 'trains') return loadStop();
+  if (view === 'ride') return loadRide();
+  if (view === 'find2') return loadFind();
+}
+
+async function loadStop(){
+  if (!stop) return;
   try {
-    const j = await api(`/predictions?filter[stop]=${stop.id}&filter[route]=${ROUTES}&include=vehicle,trip&fields[vehicle]=label,carriages&fields[trip]=headsign`);
-    const inc = {};
-    (j.included || []).forEach(x => inc[x.type + x.id] = x);
-    const now = Date.now();
-    last = j.data.map(p => {
-      const a = p.attributes, rl = p.relationships;
-      const t = Date.parse(a.arrival_time || a.departure_time);
-      const v = rl.vehicle.data && inc['vehicle' + rl.vehicle.data.id];
-      const tr = rl.trip.data && inc['trip' + rl.trip.data.id];
-      return {r:rl.route.data.id, d:a.direction_id, t, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
-    }).filter(x => !isNaN(x.t) && x.t - now > -60000);
-    got = now;
+    const rs = routes().filter(r => (stop.r || []).includes(r)).join(',');
+    const j = await api(`/predictions?filter[stop]=${stop.id}&filter[route]=${rs}` + PQ);
+    if (view !== 'trains') return;
+    last = parsePred(j);
+    got = Date.now(); ok();
     render();
-  } catch(e) {
-    $('age').textContent = 'offline';
-  }
+    loadAlerts(rs);
+  } catch(e) { fail(); }
+}
+
+const SKIP = ['ELEVATOR_CLOSURE','ESCALATOR_CLOSURE','ACCESS_ISSUE','PARKING_CLOSURE','PARKING_ISSUE','BIKE_ISSUE','FACILITY_ISSUE'];
+async function loadAlerts(rs){
+  if (AL.id === stop.id && Date.now() - AL.t < 120000) return;
+  try {
+    const j = await api(`/alerts?filter[route]=${rs}&filter[datetime]=NOW&fields[alert]=header,effect,informed_entity`);
+    const id = stop.id;
+    AL = {id, t:Date.now(), list:j.data.map(x => x.attributes).filter(a => !SKIP.includes(a.effect)
+      && (a.informed_entity || []).some(e => !e.stop || e.stop === id)).map(a => esc(a.header))};
+    if (view === 'trains') render();
+  } catch(e) {}
 }
 
 function when(t){
@@ -189,35 +269,107 @@ function when(t){
   return s <= 30 ? 'Now' : s < 90 ? '1 min' : Math.round(s/60) + ' min';
 }
 
-const done = c => rides.some(x => x.c === c);
-const carH = c => `<div class="car f${c.slice(0,2)}${done(c) ? ' got' : ''}" data-c="${c}"><i></i><span>${c}</span><u></u></div>`;
+const cls = (c, r, o) => r === 'Orange' ? 'fO' + (o || 0) : 'f' + c.slice(0,2);
+const done = (c, r) => { const L = lineOf(r); return rides.some(x => x.c === c && (x.l ? x.l === L : L === 'Red' || L === 'Green')); };
+const carH = r => x => r === 'Orange' ? `<div class="car ${cls(x.n, r, x.o)}"><i></i><span>${x.n}</span><u></u></div>`
+  : `<div class="car ${cls(x.n, r)}${done(x.n, r) ? ' got' : ''}" data-c="${x.n}" data-r="${r}"><i></i><span>${x.n}</span><u></u>${x.o ? `<b class="oc o${x.o}"></b>` : ''}</div>`;
+const mini = (cars, r) => `<span class="mini">${cars.map(x => `<i class="${cls(x.n, r, x.o)}"></i>`).join('')}</span>`;
+const headOf = x => (x.r.startsWith('Green') ? x.r.slice(-1) + ' · ' : '') + x.h;
+const trainH = (x, tap) => `<div class="tr"><div class="hd${tap && x.vid ? ' tap' : ''}"${tap && x.vid ? ` data-ride="${x.vid}"` : ''}><span>${headOf(x)}</span><b class="${x.t - Date.now() < 90000 ? 'soon' : ''}">${when(x.t)}</b></div>${consist(x.cars, x.r)}</div>`;
 
-function consist(cars){
+function consist(cars, r){
   if (!cars.length) return '<div class="none">Cars not assigned yet</div>';
-  if (cars.length === 1 && /^1[5-9]/.test(cars[0])) return `<div class="ln"><div class="e">FWD</div><div class="cs">${carH(cars[0])}<div class="none" style="flex:2;align-self:center">lead car only</div></div></div>`;
+  if (cars.length === 1 && r === 'Red') return `<div class="ln"><div class="e">FWD</div><div class="cs">${carH(r)(cars[0])}<div class="none" style="flex:2;align-self:center">lead car only</div></div></div>`;
   const L = [];
   for (let i = 0; i < cars.length; i += 3) L.push(cars.slice(i, i+3));
-  return L.map((l,i) => `<div class="ln"><div class="e">${i ? 'MID' : 'FWD'}</div><div class="cs">${l.map(carH).join('')}</div><div class="e r">${i === L.length-1 ? 'AFT' : 'MID'}</div></div>`).join('');
+  return L.map((l,i) => `<div class="ln"><div class="e">${i ? 'MID' : 'FWD'}</div><div class="cs">${l.map(carH(r)).join('')}</div><div class="e r">${i === L.length-1 ? 'AFT' : 'MID'}</div></div>`).join('');
 }
 
 function render(){
   if (view !== 'trains') return;
-  let h = '';
+  let h = AL.id === stop.id ? AL.list.slice(0, 3).map((t,i) => `<div class="al${alOpen === i ? ' open' : ''}" data-al="${i}">${t}</div>`).join('') : '';
   for (const g of GROUPS) {
-    const rs = g.r.filter(r => (stop.r || []).includes(r) && !(TERM[stop.id] && TERM[stop.id][0] === r && TERM[stop.id][1] === g.d));
+    const rs = g.r.filter(r => (stop.r || []).includes(r) && !isTerm(stop.id, r, g.d));
     if (!rs.length) continue;
-    const it = last.filter(x => rs.includes(x.r) && x.d === g.d).sort((a,b) => a.t - b.t).slice(0, 2);
+    const all = last.filter(x => rs.includes(x.r) && x.d === g.d).sort((a,b) => a.t - b.t);
     const lab = g.l || rs.map(r => r.slice(-1)).sort().join(' and ') + (g.d ? ' · inbound' : ' · outbound');
     h += `<div class="sec ${g.c}">${lab}</div>`;
-    if (!it.length) h += '<div class="none">None predicted right now</div>';
-    for (const x of it) {
-      const soon = x.t - Date.now() < 90000;
-      const head = (x.r === 'Red' ? '' : x.r.slice(-1) + ' · ') + x.h;
-      h += `<div class="tr"><div class="hd"><span>${head}</span><b class="${soon ? 'soon' : ''}">${when(x.t)}</b></div>${consist(x.cars)}</div>`;
-    }
+    if (!all.length) h += '<div class="none">None predicted right now</div>';
+    all.slice(0, 2).forEach(x => h += trainH(x, true));
+    all.slice(2, 5).forEach(x => h += `<div class="lat"><span>${headOf(x)}</span>${mini(x.cars, x.r)}<b>${when(x.t)}</b></div>`);
   }
   $('main').innerHTML = h || '<div class="msg">No trains predicted right now.</div>';
-  $('age').textContent = '';
+}
+
+function startRide(vid){
+  const x = last.find(y => y.vid === vid);
+  if (!x) return;
+  ride = {vid, r:x.r, d:x.d, h:x.h, cars:x.cars, at:null};
+  view = 'ride'; nav();
+  $('st').textContent = 'On this train';
+  $('main').innerHTML = '<div class="msg">Finding your train…</div>';
+  scrollTo(0, 0);
+  loadRide();
+}
+
+async function loadRide(){
+  try {
+    const j = await api(`/vehicles/${encodeURIComponent(ride.vid)}?include=stop&fields[vehicle]=label,carriages,current_status&fields[stop]=name,parent_station`);
+    if (view !== 'ride') return;
+    const v = j.data, st = (j.included || [])[0];
+    if (!st) throw Error('no stop');
+    ride.cars = carsOf(v);
+    const ps = st.relationships && st.relationships.parent_station && st.relationships.parent_station.data;
+    const at = ps ? ps.id : st.id, atName = st.attributes.name, here = v.attributes.current_status === 'STOPPED_AT';
+    const rs = routes().filter(r => lineOf(r) === lineOf(ride.r)).join(',');
+    const p = parsePred(await api(`/predictions?filter[stop]=${at}&filter[route]=${rs}` + PQ));
+    if (view !== 'ride') return;
+    const me = p.find(x => x.vid === ride.vid);
+    const other = p.filter(x => x.d !== ride.d).sort((a,b) => a.t - b.t).slice(0, 3);
+    let h = `<div class="sec ${GROUPS.find(g => g.r.includes(ride.r)).c}">${headOf(ride)}</div>`
+      + `<div class="hd" style="margin-top:4px"><span>${here ? 'At' : 'Next'}: ${atName}</span><b>${here ? 'now' : me ? when(me.t) : ''}</b></div>`
+      + consist(ride.cars, ride.r)
+      + `<div class="sec">Other way at ${atName}</div>`
+      + (other.length ? other.map(x => trainH(x, false)).join('') : '<div class="none">None predicted right now</div>');
+    $('main').innerHTML = h; ok();
+  } catch(e) {
+    if (e.message === '404') { $('main').innerHTML = '<div class="msg">This train finished its trip.</div>'; return; }
+    fail();
+  }
+}
+
+function find1(){
+  view = 'find1'; nav();
+  $('st').textContent = 'Where are you?';
+  const b = (s,k) => `<button data-f="${s.id}"${k ? ' class="kid"' : ''}>${s.n}</button>`;
+  $('main').innerHTML = S.fav.map(id => stops.find(s => s.id === id)).filter(s => s && s.r.includes('Red')).map(s => b(s)).join('')
+    + GRP.map((g,i) => g.L === 'Red' && g.list.length ? `<button class="grp R" data-fg="${i}">${openG === i ? '▾' : '▸'} ${g.n}</button>`
+      + (openG === i ? g.list.map(s => b(s,1)).join('') : '') : '').join('');
+}
+
+const OLD = c => /^1[56]/.test(c.n);
+async function loadFind(){
+  try {
+    const p = parsePred(await api(`/predictions?filter[stop]=${fStop.id}&filter[route]=Red` + PQ));
+    if (view !== 'find2') return;
+    let h = '';
+    for (const d of [0, 1]) {
+      if (isTerm(fStop.id, 'Red', d)) continue;
+      const x = p.filter(y => y.d === d && y.cars.some(OLD)).sort((a,b) => a.t - b.t)[0];
+      h += `<div class="sec R">${d ? 'Northbound' : 'Southbound'}</div>` + (x ? trainH(x, false) : '<div class="none">No 1500/1600s headed here yet</div>');
+    }
+    const seen = new Set(p.filter(y => y.cars.some(OLD)).map(y => y.vid));
+    const j = await api('/vehicles?filter[route]=Red&include=stop&fields[vehicle]=label,carriages,direction_id&fields[stop]=name');
+    if (view !== 'find2') return;
+    const sn = {};
+    (j.included || []).forEach(s => sn[s.id] = s.attributes.name);
+    const else_ = j.data.filter(v => !seen.has(v.id) && carsOf(v).some(OLD));
+    if (else_.length) h += '<div class="sec">Running elsewhere</div>' + else_.map(v => {
+      const s = v.relationships.stop.data;
+      return `<div class="lat"><span>${s ? sn[s.id] || '' : ''} · ${v.attributes.direction_id ? 'north' : 'south'}</span>${mini(carsOf(v), 'Red')}</div>`;
+    }).join('');
+    $('main').innerHTML = h || '<div class="msg">No 1500/1600s running right now.</div>'; ok();
+  } catch(e) { fail(); }
 }
 
 function sync(a, e){
@@ -233,17 +385,20 @@ function toast(m, u){
   tT = setTimeout(() => { $('toast').style.display = 'none'; lastAdd = null; }, 5000);
 }
 
-function logCar(c){
-  if (done(c)) { toast(c + ' already logged'); return; }
-  lastAdd = {id:'r' + Date.now(), c, s:stop ? stop.n : '', t:Date.now(), ok:false};
+function logCar(c, r){
+  if (done(c, r)) { toast(c + ' already logged'); return; }
+  lastAdd = {id:'r' + Date.now(), c, l:lineOf(r), s:stop ? stop.n : '', t:Date.now(), ok:false};
   rides.unshift(lastAdd); save(); sync('add', lastAdd);
-  toast('Logged ' + c, true); render();
+  toast('Logged ' + c, true); markCars();
 }
+
+function markCars(){ document.querySelectorAll('.car[data-c]').forEach(e => e.classList.toggle('got', done(e.dataset.c, e.dataset.r))); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function undo(){
   if (!lastAdd) return;
   rides = rides.filter(x => x.id !== lastAdd.id); save(); sync('remove', lastAdd);
-  lastAdd = null; $('toast').style.display = 'none'; render();
+  lastAdd = null; $('toast').style.display = 'none'; markCars();
 }
 
 function showLog(){
@@ -251,7 +406,7 @@ function showLog(){
   $('st').textContent = 'Ride log';
   nav();
   const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
-  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car f${x.c.slice(0,2)}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`;
+  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`;
   const open = rides.filter(x => !x.ok), doneN = rides.length - open.length;
   $('main').innerHTML = (open.length ? open.map(row).join('') : '<div class="msg">All checked off.</div>')
     + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '') + keyH();
@@ -263,24 +418,43 @@ function showTrains(){
 
 document.addEventListener('click', ev => {
   const t = ev.target;
-  const car = t.closest('.car[data-c]'); if (car) return logCar(car.dataset.c);
+  const car = t.closest('.car[data-c]'); if (car) return logCar(car.dataset.c, car.dataset.r);
   const row = t.closest('.lr'); if (row) {
     const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r);
     row.querySelector('.ck').classList.toggle('on', r.ok);
     clearTimeout(ckT); ckT = setTimeout(() => { if (view === 'log') showLog(); }, 1500);
     return;
   }
-  const g = t.closest('[data-g]'); if (g) { openG = openG === +g.dataset.g ? -1 : +g.dataset.g; picker(); return; }
+  const rd = t.closest('[data-ride]'); if (rd) return startRide(rd.dataset.ride);
+  const al = t.closest('[data-al]'); if (al) { alOpen = alOpen === +al.dataset.al ? -1 : +al.dataset.al; return render(); }
+  if (t.id === 'findBtn') { openG = -1; return find1(); }
+  const fg = t.closest('[data-fg]'); if (fg) { openG = openG === +fg.dataset.fg ? -1 : +fg.dataset.fg; return find1(); }
+  const f = t.closest('[data-f]'); if (f) { fStop = stops.find(x => x.id === f.dataset.f); view = 'find2'; nav(); $('st').textContent = '1500/1600s near ' + fStop.n; $('main').innerHTML = '<div class="msg">Looking…</div>'; scrollTo(0, 0); return loadFind(); }
+  if (t.id === 'age') return refresh();
+  const g = t.closest('[data-g]'); if (g) { openG = openG === +g.dataset.g ? -1 : +g.dataset.g; picker(view === 'addfav'); return; }
   if (t.closest('[data-key]')) { keyOpen = !keyOpen; return view === 'log' ? showLog() : picker(); }
-  if (t.id === 'backBtn') return picker();
+  if (t.id === 'backBtn') return view === 'addfav' ? settings() : view === 'ride' ? setStop(stop) : view === 'find2' ? find1() : picker();
   if (t.id === 'doneBtn') { showDone = !showDone; return showLog(); }
-  const s = t.closest('[data-s]'); if (s) return setStop(stops.find(x => x.id === s.dataset.s));
+  if (t.id === 'setBtn') return settings();
+  const uf = t.closest('[data-unfav]'); if (uf) { S.fav = S.fav.filter(x => x !== uf.dataset.unfav); saveS(); return settings(); }
+  if (t.closest('[data-addfav]')) { openG = -1; return picker(true); }
+  if (t.closest('[data-reset]')) {
+    if (!armed) { armed = true; settings(); clearTimeout(armT); armT = setTimeout(() => { armed = false; if (view === 'set') settings(); }, 4000); return; }
+    armed = false; clearTimeout(armT);
+    S = JSON.parse(JSON.stringify(DEF)); saveS(); openG = -1; keyOpen = false;
+    try { localStorage.removeItem('settings'); } catch(e) {}
+    toast('Settings reset'); return changed();
+  }
+  const s = t.closest('[data-s]'); if (s) {
+    if (view === 'addfav') { if (!S.fav.includes(s.dataset.s)) S.fav.push(s.dataset.s); saveS(); openG = -1; return settings(); }
+    return setStop(stops.find(x => x.id === s.dataset.s));
+  }
   if (t.id === 'logBtn') return view === 'log' ? (stop ? showTrains() : picker()) : showLog();
   if (t.id === 'undo') return undo();
 });
 
 setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 20000);
-setInterval(() => { if (view === 'trains' && got) render(); }, 15000);
+setInterval(() => { if (view === 'trains' && got) render(); if (okT) age($('main').classList.contains('dim')); }, 15000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 
 (async () => {
