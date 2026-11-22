@@ -8,10 +8,10 @@
 <style>
 :root{color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;background:#000;color:#fff;font:13px -apple-system,system-ui,sans-serif;padding:2px 6px 64px;-webkit-user-select:none;user-select:none}
+body{margin:0;background:#000;color:#fff;font:13px -apple-system,system-ui,sans-serif;padding:2px 6px 96px;-webkit-user-select:none;user-select:none}
 button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;padding:8px 10px;width:100%;margin-top:6px;text-align:left}
 #hdr{display:flex;justify-content:space-between;align-items:center;padding:2px}
-#st{background:none;padding:0;margin:0;width:auto;color:#aaa;font-size:12px}
+#st{color:#aaa;font-size:12px}
 #age{font-size:11px;color:#666}
 .sec{font-size:11px;margin-top:8px;padding:0 2px 2px;border-bottom:.5px solid #333}
 .R{color:#F09595}.G{color:#97C459}
@@ -37,9 +37,13 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .car.got{opacity:.45}
 .grp{font-weight:600}.grp.R{color:#F09595}.grp.G{color:#97C459}
 .kid{background:#111;padding-left:18px;margin-top:4px}
+#nav{position:fixed;left:6px;right:6px;bottom:6px;display:flex;gap:6px}
+#nav button{margin:0;text-align:center;background:#2c2c2e;padding:9px 4px}
+#backBtn{flex:1}#logBtn{flex:1}
+.key .car{height:26px;margin-top:4px}.key .car span{justify-content:flex-start;padding-left:8px}
 .none{font-size:11px;color:#666;padding:2px}
 .msg{color:#888;font-size:12px;padding:8px 2px}
-#toast{position:fixed;left:6px;right:6px;bottom:8px;background:#2c2c2e;border-radius:14px;padding:6px 6px 6px 12px;display:none;align-items:center;justify-content:space-between}
+#toast{position:fixed;left:6px;right:6px;bottom:52px;background:#2c2c2e;border-radius:14px;padding:6px 6px 6px 12px;display:none;align-items:center;justify-content:space-between}
 #toast button{width:auto;margin:0;background:#FFD60A;color:#2a2200;padding:4px 12px}
 .lr{display:flex;align-items:center;gap:8px;padding:6px 2px;border-top:.5px solid #2a2a2a}
 .ck{width:20px;height:20px;border-radius:50%;border:1.5px solid #555;flex-shrink:0}
@@ -49,9 +53,9 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 </style>
 </head>
 <body>
-<div id="hdr"><button id="st">Locating…</button><span id="age"></span></div>
+<div id="hdr"><span id="st">Loading…</span><span id="age"></span></div>
 <div id="main"></div>
-<button id="logBtn">Ride log</button>
+<div id="nav"><button id="backBtn">‹ Stops</button><button id="logBtn">Ride log</button></div>
 <div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
 <script>
 // ===== Settings =====
@@ -94,7 +98,16 @@ const GRP = [
   ['B branch','G','Green-B','Blandford Street,Boston University East,Boston University Central,Amory Street,Babcock Street,Packards Corner,Harvard Avenue,Griggs Street,Allston Street,Warren Street,Washington Street,Sutherland Road,Chiswick Road,Chestnut Hill Avenue,South Street,Boston College'],
   ['E branch','G','Green-E','Prudential,Symphony,Northeastern University,Museum of Fine Arts,Longwood Medical Area,Brigham Circle,Fenwood Road,Mission Park,Riverway,Back of the Hill,Heath Street']
 ].map(([n,c,r,l]) => ({n, c, r, order:l.split(',').map(norm), list:[]}));
-let openG = -1;
+let openG = -1, keyOpen = false;
+const KEYS = [['15','1500s / 1600s'],['17','1700s'],['18','1800s'],['19','1900s'],['36','Type 7'],['38','Type 8'],['39','Type 9']];
+const keyH = () => `<button class="grp" data-key="1">${keyOpen ? '▾' : '▸'} Color key</button>` + (keyOpen ? '<div class="key">' + KEYS.map(([f,n]) => `<div class="car f${f}"><i></i><span>${n}</span><u></u></div>`).join('') + '</div>' : '');
+const TERM = {'place-alfcl':['Red',1],'place-asmnl':['Red',0],'place-brntn':['Red',0],'place-lake':['Green-B',0],'place-clmnl':['Green-C',0],'place-river':['Green-D',0],'place-hsmnl':['Green-E',0],'place-mdftf':['Green-E',1],'place-unsqu':['Green-D',1]};
+function nav(){
+  $('backBtn').style.display = view === 'pick' ? 'none' : '';
+  $('logBtn').style.display = '';
+  $('logBtn').textContent = view === 'log' ? (stop ? 'Trains' : 'Stops') : 'Ride log';
+  if (view === 'log' && !stop) $('logBtn').style.display = 'none';
+}
 const RDT = GRP[0], GDT = GRP[1];
 
 function norm(s){ return s.toLowerCase().replace(/^st\.? /,'saint ').replace(/[^a-z0-9]/g,''); }
@@ -128,16 +141,16 @@ async function getStops(){
 function picker(){
   view = 'pick';
   $('st').textContent = 'Stops';
-  $('logBtn').textContent = 'Ride log';
+  nav();
   const b = (s,k) => `<button data-s="${s.id}"${k ? ' class="kid"' : ''}>${s.n}</button>`;
   $('main').innerHTML = QUICK.map(id => stops.find(s => s.id === id)).filter(Boolean).map(s => b(s)).join('')
     + GRP.map((g,i) => `<button class="grp ${g.c}" data-g="${i}">${openG === i ? '▾' : '▸'} ${g.n}</button>`
-      + (openG === i ? g.list.map(s => b(s,1)).join('') : '')).join('');
+      + (openG === i ? g.list.map(s => b(s,1)).join('') : '')).join('') + keyH();
 }
 
 function setStop(s){
-  stop = s; view = 'trains';
-  $('st').textContent = s.n + ' ▾';
+  stop = s; view = 'trains'; nav();
+  $('st').textContent = s.n;
   $('main').innerHTML = '<div class="msg">Loading…</div>';
   try { history.replaceState(null, '', '?stop=' + s.id); } catch(e) {}
   scrollTo(0, 0);
@@ -191,10 +204,12 @@ function render(){
   if (view !== 'trains') return;
   let h = '';
   for (const g of GROUPS) {
-    const it = last.filter(x => g.r.includes(x.r) && x.d === g.d).sort((a,b) => a.t - b.t).slice(0, 2);
-    if (!it.length) continue;
-    const lab = g.l || [...new Set(it.map(x => x.r.slice(-1)))].sort().join(' and ') + (g.d ? ' · inbound' : ' · outbound');
+    const rs = g.r.filter(r => (stop.r || []).includes(r) && !(TERM[stop.id] && TERM[stop.id][0] === r && TERM[stop.id][1] === g.d));
+    if (!rs.length) continue;
+    const it = last.filter(x => rs.includes(x.r) && x.d === g.d).sort((a,b) => a.t - b.t).slice(0, 2);
+    const lab = g.l || rs.map(r => r.slice(-1)).sort().join(' and ') + (g.d ? ' · inbound' : ' · outbound');
     h += `<div class="sec ${g.c}">${lab}</div>`;
+    if (!it.length) h += '<div class="none">None predicted right now</div>';
     for (const x of it) {
       const soon = x.t - Date.now() < 90000;
       const head = (x.r === 'Red' ? '' : x.r.slice(-1) + ' · ') + x.h;
@@ -234,16 +249,15 @@ function undo(){
 function showLog(){
   view = 'log';
   $('st').textContent = 'Ride log';
-  $('logBtn').textContent = stop ? 'Trains' : 'Stops';
+  nav();
   const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
   const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car f${x.c.slice(0,2)}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`;
   const open = rides.filter(x => !x.ok), doneN = rides.length - open.length;
   $('main').innerHTML = (open.length ? open.map(row).join('') : '<div class="msg">All checked off.</div>')
-    + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '');
+    + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '') + keyH();
 }
 
 function showTrains(){
-  $('logBtn').textContent = 'Ride log';
   if (stop) setStop(stop); else picker();
 }
 
@@ -257,9 +271,10 @@ document.addEventListener('click', ev => {
     return;
   }
   const g = t.closest('[data-g]'); if (g) { openG = openG === +g.dataset.g ? -1 : +g.dataset.g; picker(); return; }
+  if (t.closest('[data-key]')) { keyOpen = !keyOpen; return view === 'log' ? showLog() : picker(); }
+  if (t.id === 'backBtn') return picker();
   if (t.id === 'doneBtn') { showDone = !showDone; return showLog(); }
   const s = t.closest('[data-s]'); if (s) return setStop(stops.find(x => x.id === s.dataset.s));
-  if (t.id === 'st') return view === 'trains' ? picker() : null;
   if (t.id === 'logBtn') return view === 'log' ? (stop ? showTrains() : picker()) : showLog();
   if (t.id === 'undo') return undo();
 });
