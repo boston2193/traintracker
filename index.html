@@ -39,7 +39,8 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .kid{background:#111;padding-left:18px;margin-top:4px}
 #nav{position:fixed;left:6px;right:6px;bottom:6px;display:flex;gap:6px}
 #nav button{margin:0;text-align:center;background:#2c2c2e;padding:9px 4px}
-#backBtn{flex:1}#logBtn{flex:1}
+#backBtn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#backBtn.off{opacity:.35}
+#homeBtn,#logBtn{flex:0 0 42px;font-size:17px;padding:6px 0}
 .key .car{height:26px;margin-top:4px}.key .car span{justify-content:flex-start;padding-left:8px}
 .O{color:#FFB366}
 .grp.O{color:#FFB366}
@@ -81,7 +82,7 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 <body>
 <div id="hdr"><span id="st">Loading…</span><span id="age"></span></div>
 <div id="main"></div>
-<div id="nav"><button id="backBtn">‹ Stops</button><button id="logBtn">Ride log</button></div>
+<div id="nav"><button id="backBtn">‹ Back</button><button id="homeBtn" aria-label="Stops">🏠</button><button id="logBtn" aria-label="Ride log">✅</button></div>
 <div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
 <script>
 // ===== Settings =====
@@ -142,14 +143,36 @@ const KEYS = [['f15','1500s / 1600s','Red'],['f17','1700s','Red'],['f18','1800s'
 const keyH = () => `<button class="grp" data-key="1">${keyOpen ? '▾' : '▸'} Color key</button>` + (keyOpen ? '<div class="key">' + KEYS.map(([f,n]) => `<div class="car ${f}"><i></i><span>${n}</span><u></u></div>`).join('') + '</div>' : '');
 const TERM = {'place-alfcl':[['Red',1]],'place-asmnl':[['Red',0]],'place-brntn':[['Red',0]],'place-lake':[['Green-B',0]],'place-clmnl':[['Green-C',0]],'place-river':[['Green-D',0]],'place-hsmnl':[['Green-E',0]],'place-mdftf':[['Green-E',1]],'place-unsqu':[['Green-D',1]],'place-ogmnl':[['Orange',1]],'place-forhl':[['Orange',0]]};
 const isTerm = (id,r,d) => (TERM[id] || []).some(x => x[0] === r && x[1] === d);
-function nav(){
-  $('backBtn').style.display = view === 'pick' ? 'none' : '';
-  $('backBtn').textContent = view === 'addfav' ? '‹ Settings' : view === 'ride' && stop ? '‹ Station' : view === 'find2' ? '‹ Where' : view === 'num2' ? '‹ Keypad' : view === 'bus2' ? '‹ Routes' : view === 'bus3' ? '‹ Direction' : view === 'ride' && !stop ? '‹ Stops' : '‹ Stops';
-  $('main').classList.remove('dim'); okT = 0; $('age').textContent = '';
-  $('logBtn').style.display = '';
-  $('logBtn').textContent = view === 'log' ? (stop ? 'Trains' : 'Stops') : 'Ride log';
-  if (view === 'log' && !stop) $('logBtn').style.display = 'none';
+// ---- Navigation: back returns to the screen you came from ----
+let hist = [], cur = null, goingBack = false;
+function snap(){
+  const d = {v:view, stop, ride, fStop, numQ, numO, busSet, busDir};
+  d.k = view + '|' + (view === 'trains' ? stop && stop.id : view === 'ride' ? ride && ride.vid : view === 'find2' ? fStop && fStop.id : view === 'num2' ? numQ : view === 'bus2' ? busSet : view === 'bus3' ? busSet + '' + busDir : '');
+  return d;
 }
+const LBL = d => ({pick:'Stops', trains:d.stop ? d.stop.n : 'Station', ride:'Train', find1:'Where', find2:'1500s', num:'Keypad', num2:'Car ' + d.numQ, bus1:'Bus', bus2:BUS[d.busSet] ? BUS[d.busSet].n : 'Bus', bus3:'Bus times', log:'Ride log', set:'Settings', addfav:'Add stop'})[d.v] || 'Back';
+function nav(){
+  const d = snap();
+  if (!goingBack && cur && cur.k !== d.k) { hist.push(cur); if (hist.length > 25) hist.shift(); }
+  cur = d;
+  const p = hist[hist.length - 1];
+  $('backBtn').textContent = '‹ ' + (p ? LBL(p) : 'Back');
+  $('backBtn').classList.toggle('off', !p);
+  $('main').classList.remove('dim'); okT = 0; $('age').textContent = '';
+}
+function show(d){
+  goingBack = true;
+  try {
+    ({stop, ride, fStop, numQ, numO, busSet, busDir} = d);
+    ({pick:() => picker(), trains:() => setStop(d.stop), ride:() => startRide(d.ride.vid, d.ride), find1:find1, find2:openFind2,
+      num:keypad, num2:openNum2, bus1:bus1, bus2:bus2, bus3:openBus3, log:showLog, set:settings, addfav:() => picker(true)}[d.v] || picker)();
+  } finally { goingBack = false; }
+}
+function goBack(){ const p = hist.pop(); if (p) show(p); }
+function goHome(){ hist = []; goingBack = true; try { picker(); } finally { goingBack = false; } }
+function openFind2(){ view = 'find2'; nav(); $('st').textContent = '1500/1600s near ' + fStop.n; $('main').innerHTML = '<div class="msg">Looking…</div>'; scrollTo(0, 0); loadFind(); }
+function openNum2(){ view = 'num2'; nav(); $('st').textContent = 'Car ' + numQ; $('main').innerHTML = '<div class="msg">Looking…</div>'; scrollTo(0, 0); loadNum(); }
+function openBus3(){ view = 'bus3'; nav(); $('st').textContent = BUS[busSet].n + (busDir ? ' · to Harvard' : ' · outbound'); $('main').innerHTML = '<div class="msg">Loading…</div>'; scrollTo(0, 0); loadBus(); }
 
 function norm(s){ return s.toLowerCase().replace(/^st\.? /,'saint ').replace(/[^a-z0-9]/g,''); }
 
@@ -578,7 +601,7 @@ document.addEventListener('click', ev => {
   }
   if (t.id === 'busBtn') return bus1();
   const bs = t.closest('[data-bs]'); if (bs) { busSet = +bs.dataset.bs; return bus2(); }
-  const bd = t.closest('[data-bd]'); if (bd) { busDir = +bd.dataset.bd; view = 'bus3'; nav(); $('st').textContent = BUS[busSet].n + (busDir ? ' · to Harvard' : ' · outbound'); $('main').innerHTML = '<div class="msg">Loading…</div>'; return loadBus(); }
+  const bd = t.closest('[data-bd]'); if (bd) { busDir = +bd.dataset.bd; return openBus3(); }
   const row = t.closest('.lr'); if (row) {
     const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r);
     row.querySelector('.ck').classList.toggle('on', r.ok);
@@ -595,16 +618,17 @@ document.addEventListener('click', ev => {
     if (v === 'del') numIn = numIn.slice(0, -1);
     else if (v === 'go') { if (!numIn) return; }
     else if (numIn.length < 4) numIn += v;
-    if (v === 'go' || numIn.length === 4) { numQ = numIn; numIn = ''; view = 'num2'; nav(); $('st').textContent = 'Car ' + numQ; $('main').innerHTML = '<div class="msg">Looking…</div>'; return loadNum(); }
+    if (v === 'go' || numIn.length === 4) { numQ = numIn; numIn = ''; return openNum2(); }
     return keypad();
   }
   if (t.closest('[data-follow]') && numO) return startRide(numO.vid, numO);
   const fg = t.closest('[data-fg]'); if (fg) { openG = openG === +fg.dataset.fg ? -1 : +fg.dataset.fg; return find1(); }
-  const f = t.closest('[data-f]'); if (f) { fStop = stops.find(x => x.id === f.dataset.f); view = 'find2'; nav(); $('st').textContent = '1500/1600s near ' + fStop.n; $('main').innerHTML = '<div class="msg">Looking…</div>'; scrollTo(0, 0); return loadFind(); }
+  const f = t.closest('[data-f]'); if (f) { fStop = stops.find(x => x.id === f.dataset.f); return openFind2(); }
   if (t.id === 'age') return refresh();
   const g = t.closest('[data-g]'); if (g) { openG = openG === +g.dataset.g ? -1 : +g.dataset.g; picker(view === 'addfav'); return; }
   if (t.closest('[data-key]')) { keyOpen = !keyOpen; return view === 'log' ? showLog() : picker(); }
-  if (t.id === 'backBtn') return view === 'addfav' ? settings() : view === 'ride' ? (stop ? setStop(stop) : picker()) : view === 'find2' ? find1() : view === 'num2' ? keypad() : view === 'bus2' ? bus1() : view === 'bus3' ? bus2() : picker();
+  if (t.id === 'backBtn') return goBack();
+  if (t.id === 'homeBtn') return goHome();
   if (t.id === 'doneBtn') { showDone = !showDone; return showLog(); }
   if (t.id === 'setBtn') return settings();
   const uf = t.closest('[data-unfav]'); if (uf) { S.fav = S.fav.filter(x => x !== uf.dataset.unfav); saveS(); return settings(); }
@@ -617,10 +641,10 @@ document.addEventListener('click', ev => {
     toast('Settings reset'); return changed();
   }
   const s = t.closest('[data-s]'); if (s) {
-    if (view === 'addfav') { if (!S.fav.includes(s.dataset.s)) S.fav.push(s.dataset.s); saveS(); openG = -1; return settings(); }
+    if (view === 'addfav') { if (!S.fav.includes(s.dataset.s)) S.fav.push(s.dataset.s); saveS(); openG = -1; return goBack(); }
     return setStop(stops.find(x => x.id === s.dataset.s));
   }
-  if (t.id === 'logBtn') return view === 'log' ? (stop ? showTrains() : picker()) : showLog();
+  if (t.id === 'logBtn') return view === 'log' ? null : showLog();
   if (t.id === 'undo') return undo();
 });
 
