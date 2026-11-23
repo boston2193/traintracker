@@ -52,11 +52,21 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .o1{background:#30D158}.o2{background:#FFD60A}.o3{background:#FF453A}
 .lat{display:flex;align-items:center;gap:6px;padding:3px 2px;font-size:12px;color:#aaa}
 .lat span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-.mini{display:flex;gap:1px;flex:0 0 auto}.mini i{display:block;width:7px;height:11px;border-radius:1px}
+.mini{display:flex;gap:2px;flex:0 0 auto}.mini .car{zoom:.5;flex:0 0 20px;height:28px;border-radius:6px}
+.lat[data-x]{cursor:pointer}
 .al{background:#3a2a00;color:#FFD60A;border-radius:10px;padding:5px 8px;margin-top:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .al.open{white-space:normal}
 .dim{opacity:.5}
 .hd.tap span:first-child::after{content:" ›";color:#666}
+.hd em{font-style:normal;font-size:10px;background:#5a3a00;color:#FFB340;border-radius:4px;padding:0 4px;margin-right:4px}
+.lat em{font-style:normal;color:#FFB340}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:4px}
+.kp button{margin:0;text-align:center;font-size:18px;padding:8px 0}
+.num{font-size:26px;text-align:center;letter-spacing:4px;font-variant-numeric:tabular-nums;padding:4px 0;min-height:38px}
+.sr{display:flex;justify-content:space-between;padding:4px 2px;border-top:.5px solid #222;font-size:12px}
+.sr.pin{color:#FFD60A}.sr b{font-weight:600}
+.bus{display:flex;justify-content:space-between;padding:5px 2px;border-top:.5px solid #222}
+.bus span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:6px}
 .none{font-size:11px;color:#666;padding:2px}
 .msg{color:#888;font-size:12px;padding:8px 2px}
 #toast{position:fixed;left:6px;right:6px;bottom:52px;background:#2c2c2e;border-radius:14px;padding:6px 6px 6px 12px;display:none;align-items:center;justify-content:space-between}
@@ -75,8 +85,13 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 <div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
 <script>
 // ===== Settings =====
-const KEY = '';     // free MBTA API key (api-v3.mbta.com) – optional but recommended
+const KEY = 'a0bc163d699f4a85b3b8b444a49e3e08';     // free MBTA API key (api-v3.mbta.com) – optional but recommended
 const SYNC = '';    // Google Apps Script web app URL – optional, sends your log to a Google Sheet
+const PIN = ['place-tapst','place-bcnfd','place-harsq','place-pktrm'];  // stops pinned in the train view
+const BUS = [  // Find bus: inbound stop is matched by words in its name; outbound leaves from Harvard
+  {n:'74 / 75 / 78', r:['74','75','78'], words:['concord','huron']},
+  {n:'71 / 73', r:['71','73'], words:['auburn','sparks']}
+];
 // ====================
 
 const API = 'https://api-v3.mbta.com';
@@ -100,7 +115,7 @@ const GROUPS = [
   {r:['Orange'],d:1,c:'O',l:'Orange · northbound'}
 ];
 const $ = id => document.getElementById(id);
-let ride = null, fStop = null, AL = {id:'', t:0, list:[]}, alOpen = -1, okT = 0, stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains', showDone = false, ckT = null;
+let lay = [], numIn = '', numQ = '', ride = null, fStop = null, AL = {id:'', t:0, list:[]}, alOpen = -1, okT = 0, stops = [], stop = null, last = [], got = 0, rides = load(), lastAdd = null, tT = null, view = 'trains', showDone = false, ckT = null;
 
 function load(){ try { return JSON.parse(localStorage.rides || '[]'); } catch(e) { return []; } }
 function save(){ try { localStorage.rides = JSON.stringify(rides); } catch(e) {} }
@@ -129,7 +144,7 @@ const TERM = {'place-alfcl':[['Red',1]],'place-asmnl':[['Red',0]],'place-brntn':
 const isTerm = (id,r,d) => (TERM[id] || []).some(x => x[0] === r && x[1] === d);
 function nav(){
   $('backBtn').style.display = view === 'pick' ? 'none' : '';
-  $('backBtn').textContent = view === 'addfav' ? '‹ Settings' : view === 'ride' ? '‹ Station' : view === 'find2' ? '‹ Where' : '‹ Stops';
+  $('backBtn').textContent = view === 'addfav' ? '‹ Settings' : view === 'ride' && stop ? '‹ Station' : view === 'find2' ? '‹ Where' : view === 'num2' ? '‹ Keypad' : view === 'bus2' ? '‹ Routes' : view === 'bus3' ? '‹ Direction' : view === 'ride' && !stop ? '‹ Stops' : '‹ Stops';
   $('main').classList.remove('dim'); okT = 0; $('age').textContent = '';
   $('logBtn').style.display = '';
   $('logBtn').textContent = view === 'log' ? (stop ? 'Trains' : 'Stops') : 'Ride log';
@@ -172,7 +187,7 @@ function picker(adding){
   $('main').innerHTML = (adding ? '' : S.fav.map(id => stops.find(s => s.id === id)).filter(Boolean).map(s => b(s)).join(''))
     + GRP.map((g,i) => g.list.length ? `<button class="grp ${g.c}" data-g="${i}">${openG === i ? '▾' : '▸'} ${g.n}</button>`
       + (openG === i ? g.list.map(s => b(s,1)).join('') : '') : '').join('')
-    + (adding ? '' : '<button id="findBtn">Find 1500/1600s</button>' + keyH() + '<button id="setBtn">Settings</button>');
+    + (adding ? '' : '<button id="findBtn">Find 1500/1600s</button><button id="numBtn">Find a car number</button><button id="busBtn">Find bus</button>' + keyH() + '<button id="setBtn">Settings</button>');
 }
 
 function settings(){
@@ -220,9 +235,12 @@ function parsePred(j){
     const vid = rl.vehicle.data && rl.vehicle.data.id;
     const v = vid && inc['vehicle' + vid];
     const tr = rl.trip.data && inc['trip' + rl.trip.data.id];
-    return {r:rl.route.data.id, d:a.direction_id, t, vid, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
+    const x = {r:rl.route.data.id, d:a.direction_id, t, vid, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
+    if (vid) TV[vid] = x;
+    return x;
   }).filter(x => !isNaN(x.t) && x.t - now > -60000);
 }
+const TV = {};
 const PQ = '&include=vehicle,trip&fields[vehicle]=label,carriages&fields[trip]=headsign';
 
 function ok(){ okT = Date.now(); $('main').classList.remove('dim'); age(); }
@@ -237,6 +255,8 @@ async function refresh(){
   if (view === 'trains') return loadStop();
   if (view === 'ride') return loadRide();
   if (view === 'find2') return loadFind();
+  if (view === 'num2') return loadNum();
+  if (view === 'bus3') return loadBus();
 }
 
 async function loadStop(){
@@ -249,7 +269,28 @@ async function loadStop(){
     got = Date.now(); ok();
     render();
     loadAlerts(rs);
+    if (TERM[stop.id]) loadLay(rs);
   } catch(e) { fail(); }
+}
+
+async function loadLay(rs){
+  try {
+    const j = await api(`/vehicles?filter[route]=${rs}&include=stop,trip`);
+    if (view !== 'trains') return;
+    const inc = {};
+    (j.included || []).forEach(x => inc[x.type + x.id] = x);
+    const id = stop.id;
+    lay = j.data.filter(v => {
+      if (v.attributes.current_status !== 'STOPPED_AT') return false;
+      const s = v.relationships.stop.data && inc['stop' + v.relationships.stop.data.id];
+      const ps = s && s.relationships && s.relationships.parent_station && s.relationships.parent_station.data;
+      return s && (s.id === id || (ps && ps.id === id));
+    }).map(v => {
+      const tr = v.relationships.trip.data && inc['trip' + v.relationships.trip.data.id];
+      return TV[v.id] = {vid:v.id, r:v.relationships.route.data.id, d:v.attributes.direction_id, h:tr ? tr.attributes.headsign : '', cars:carsOf(v), sid:id};
+    });
+    render();
+  } catch(e) {}
 }
 
 const SKIP = ['ELEVATOR_CLOSURE','ESCALATOR_CLOSURE','ACCESS_ISSUE','PARKING_CLOSURE','PARKING_ISSUE','BIKE_ISSUE','FACILITY_ISSUE'];
@@ -270,39 +311,55 @@ function when(t){
 }
 
 const cls = (c, r, o) => r === 'Orange' ? 'fO' + (o || 0) : 'f' + c.slice(0,2);
-const done = (c, r) => { const L = lineOf(r); return rides.some(x => x.c === c && (x.l ? x.l === L : L === 'Red' || L === 'Green')); };
-const carH = r => x => r === 'Orange' ? `<div class="car ${cls(x.n, r, x.o)}"><i></i><span>${x.n}</span><u></u></div>`
-  : `<div class="car ${cls(x.n, r)}${done(x.n, r) ? ' got' : ''}" data-c="${x.n}" data-r="${r}"><i></i><span>${x.n}</span><u></u>${x.o ? `<b class="oc o${x.o}"></b>` : ''}</div>`;
-const mini = (cars, r) => `<span class="mini">${cars.map(x => `<i class="${cls(x.n, r, x.o)}"></i>`).join('')}</span>`;
-const headOf = x => (x.r.startsWith('Green') ? x.r.slice(-1) + ' · ' : '') + x.h;
-const trainH = (x, tap) => `<div class="tr"><div class="hd${tap && x.vid ? ' tap' : ''}"${tap && x.vid ? ` data-ride="${x.vid}"` : ''}><span>${headOf(x)}</span><b class="${x.t - Date.now() < 90000 ? 'soon' : ''}">${when(x.t)}</b></div>${consist(x.cars, x.r)}</div>`;
+const done = (c, r) => { const L = lineOf(r); return rides.some(x => (x.c === c || x.p === c) && (x.l ? x.l === L : L === 'Red' || L === 'Green')); };
+// Red Line married pair: the car coupled right next to it in the live consist, numbered one off (1630/1631).
+// Green Line cars log on their own. If no partner is found, only the tapped car is logged.
+function pairOf(cars, i, r){
+  if (r !== 'Red' || cars.length < 2) return '';
+  const n = +cars[i].n, nb = [cars[i-1], cars[i+1]].filter(Boolean).find(x => +x.n === (n ^ 1));
+  return nb ? nb.n : '';
+}
+const carH = (r, vid, all) => (x, j) => r === 'Orange' ? `<div class="car ${cls(x.n, r, x.o)}"><i></i><span>${x.n}</span><u></u></div>`
+  : `<div class="car ${cls(x.n, r)}${done(x.n, r) ? ' got' : ''}" data-c="${x.n}" data-r="${r}" data-p="${all ? pairOf(all, all.indexOf(x), r) : ''}"${vid ? ` data-v="${vid}"` : ''}><i></i><span>${x.n}</span><u></u>${x.o ? `<b class="oc o${x.o}"></b>` : ''}</div>`;
+const mini = (cars, r) => `<span class="mini">${cars.map(x => `<div class="car ${cls(x.n, r, x.o)}"><i></i><span></span><u></u></div>`).join('')}</span>`;
+const keyOf = x => x.vid || x.r + x.t;
+let exp = null, expT = null;
+const ENDS = {Red:[['ashmont','braintree'],['alewife']], 'Green-B':[['boston college'],['government center']], 'Green-C':[['cleveland circle'],['government center']], 'Green-D':[['riverside'],['union square']], 'Green-E':[['heath street'],['medford/tufts']], Orange:[['forest hills'],['oak grove']]};
+const short = x => x.h && ENDS[x.r] && !ENDS[x.r][x.d].some(e => x.h.toLowerCase().includes(e));
+const headOf = x => (short(x) ? '<em>short</em>' : '') + (x.r.startsWith('Green') ? x.r.slice(-1) + ' · ' : '') + x.h;
+const trainH = (x, tap) => `<div class="tr"><div class="hd${tap && x.vid ? ' tap' : ''}"${tap && x.vid ? ` data-ride="${x.vid}"` : ''}><span>${headOf(x)}</span><b class="${x.t - Date.now() < 90000 ? 'soon' : ''}">${when(x.t)}</b></div>${consist(x.cars, x.r, x.vid)}</div>`;
 
-function consist(cars, r){
+function consist(cars, r, vid){
   if (!cars.length) return '<div class="none">Cars not assigned yet</div>';
-  if (cars.length === 1 && r === 'Red') return `<div class="ln"><div class="e">FWD</div><div class="cs">${carH(r)(cars[0])}<div class="none" style="flex:2;align-self:center">lead car only</div></div></div>`;
+  if (cars.length === 1 && r === 'Red') return `<div class="ln"><div class="e">FWD</div><div class="cs">${carH(r, vid)(cars[0])}<div class="none" style="flex:2;align-self:center">lead car only</div></div></div>`;
   const L = [];
   for (let i = 0; i < cars.length; i += 3) L.push(cars.slice(i, i+3));
-  return L.map((l,i) => `<div class="ln"><div class="e">${i ? 'MID' : 'FWD'}</div><div class="cs">${l.map(carH(r)).join('')}</div><div class="e r">${i === L.length-1 ? 'AFT' : 'MID'}</div></div>`).join('');
+  return L.map((l,i) => `<div class="ln"><div class="e">${i ? 'MID' : 'FWD'}</div><div class="cs">${l.map(carH(r, vid, cars)).join('')}</div><div class="e r">${i === L.length-1 ? 'AFT' : 'MID'}</div></div>`).join('');
 }
 
 function render(){
   if (view !== 'trains') return;
   let h = AL.id === stop.id ? AL.list.slice(0, 3).map((t,i) => `<div class="al${alOpen === i ? ' open' : ''}" data-al="${i}">${t}</div>`).join('') : '';
+  const wl = TERM[stop.id] ? lay.filter(v => v.sid === stop.id) : [];
+  if (wl.length) h += '<div class="sec">Waiting here</div>' + wl.map(v => {
+    const p = last.find(x => x.vid === v.vid);
+    return `<div class="tr"><div class="hd"><span>${headOf(v)}</span><b>${p ? 'leaves ' + when(p.t) : 'no time yet'}</b></div>${consist(v.cars, v.r, v.vid)}</div>`;
+  }).join('');
   for (const g of GROUPS) {
     const rs = g.r.filter(r => (stop.r || []).includes(r) && !isTerm(stop.id, r, g.d));
     if (!rs.length) continue;
-    const all = last.filter(x => rs.includes(x.r) && x.d === g.d).sort((a,b) => a.t - b.t);
+    const all = last.filter(x => rs.includes(x.r) && x.d === g.d && !wl.some(v => v.vid === x.vid)).sort((a,b) => a.t - b.t);
     const lab = g.l || rs.map(r => r.slice(-1)).sort().join(' and ') + (g.d ? ' · inbound' : ' · outbound');
     h += `<div class="sec ${g.c}">${lab}</div>`;
-    if (!all.length) h += '<div class="none">None predicted right now</div>';
+    if (!all.length) h += wl.some(v => v.d === g.d && rs.includes(v.r)) ? '<div class="none">Next one is waiting above</div>' : '<div class="none">None predicted right now</div>';
     all.slice(0, 2).forEach(x => h += trainH(x, true));
-    all.slice(2, 5).forEach(x => h += `<div class="lat"><span>${headOf(x)}</span>${mini(x.cars, x.r)}<b>${when(x.t)}</b></div>`);
+    all.slice(2, 5).forEach(x => h += exp === keyOf(x) ? trainH(x, true) : `<div class="lat" data-x="${keyOf(x)}"><span>${headOf(x)}</span>${mini(x.cars, x.r)}<b>${when(x.t)}</b></div>`);
   }
   $('main').innerHTML = h || '<div class="msg">No trains predicted right now.</div>';
 }
 
-function startRide(vid){
-  const x = last.find(y => y.vid === vid);
+function startRide(vid, o){
+  const x = o || TV[vid] || last.find(y => y.vid === vid);
   if (!x) return;
   ride = {vid, r:x.r, d:x.d, h:x.h, cars:x.cars, at:null};
   view = 'ride'; nav();
@@ -312,31 +369,126 @@ function startRide(vid){
   loadRide();
 }
 
+const XFER = {};
+async function peek(sid, after, mine){
+  const s = stops.find(x => x.id === sid);
+  const rs = (s ? s.r : []).filter(r => lineOf(r) !== lineOf(mine) || (sid === 'place-kencl' && r !== mine));
+  if (!rs.length) return null;
+  const c = XFER[sid];
+  if (!c || Date.now() - c.t > 45000) XFER[sid] = {t:Date.now(), p:parsePred(await api(`/predictions?filter[stop]=${sid}&filter[route]=${rs.join(',')}` + PQ))};
+  return XFER[sid].p.filter(x => x.t > after + 30000).sort((a,b) => a.t - b.t).slice(0, 3);
+}
+
 async function loadRide(){
   try {
-    const j = await api(`/vehicles/${encodeURIComponent(ride.vid)}?include=stop&fields[vehicle]=label,carriages,current_status&fields[stop]=name,parent_station`);
+    const j = await api(`/vehicles/${encodeURIComponent(ride.vid)}?include=stop,trip`);
     if (view !== 'ride') return;
-    const v = j.data, st = (j.included || [])[0];
-    if (!st) throw Error('no stop');
+    const v = j.data, inc = {};
+    (j.included || []).forEach(x => inc[x.type + x.id] = x);
     ride.cars = carsOf(v);
-    const ps = st.relationships && st.relationships.parent_station && st.relationships.parent_station.data;
-    const at = ps ? ps.id : st.id, atName = st.attributes.name, here = v.attributes.current_status === 'STOPPED_AT';
-    const rs = routes().filter(r => lineOf(r) === lineOf(ride.r)).join(',');
-    const p = parsePred(await api(`/predictions?filter[stop]=${at}&filter[route]=${rs}` + PQ));
-    if (view !== 'ride') return;
-    const me = p.find(x => x.vid === ride.vid);
-    const other = p.filter(x => x.d !== ride.d).sort((a,b) => a.t - b.t).slice(0, 3);
+    const st = v.relationships.stop.data && inc['stop' + v.relationships.stop.data.id];
+    const tr = v.relationships.trip.data && inc['trip' + v.relationships.trip.data.id];
+    if (tr) ride.h = tr.attributes.headsign;
+    const here = v.attributes.current_status === 'STOPPED_AT';
+    ride.at = st ? st.attributes.name : '';
+    let ups = [];
+    if (tr) {
+      const q = await api(`/predictions?filter[trip]=${encodeURIComponent(tr.id)}&include=stop&sort=stop_sequence`);
+      if (view !== 'ride') return;
+      const si = {};
+      (q.included || []).forEach(x => si[x.id] = x);
+      ups = q.data.map(p => {
+        const s = si[p.relationships.stop.data.id], ps = s && s.relationships && s.relationships.parent_station && s.relationships.parent_station.data;
+        return {sid:ps ? ps.id : p.relationships.stop.data.id, n:s ? s.attributes.name : '', t:Date.parse(p.attributes.arrival_time || p.attributes.departure_time)};
+      }).filter(x => !isNaN(x.t) && x.t > Date.now() - 30000);
+    }
+    const row = (x, pin) => `<div class="sr${pin ? ' pin' : ''}"><span>${esc(x.n)}</span><b>${when(x.t)}</b></div>`;
+    const pins = ups.filter(x => PIN.includes(x.sid));
     let h = `<div class="sec ${GROUPS.find(g => g.r.includes(ride.r)).c}">${headOf(ride)}</div>`
-      + `<div class="hd" style="margin-top:4px"><span>${here ? 'At' : 'Next'}: ${atName}</span><b>${here ? 'now' : me ? when(me.t) : ''}</b></div>`
-      + consist(ride.cars, ride.r)
-      + `<div class="sec">Other way at ${atName}</div>`
-      + (other.length ? other.map(x => trainH(x, false)).join('') : '<div class="none">None predicted right now</div>');
+      + `<div class="hd" style="margin-top:4px"><span>${here ? 'At' : 'Next'}: ${esc(ride.at)}</span><b>${here ? 'now' : ups[0] ? when(ups[0].t) : ''}</b></div>`
+      + consist(ride.cars, ride.r);
+    if (pins.length) h += '<div class="sec">Your stops</div>' + pins.map(x => row(x, true)).join('');
+    const xs = ups.filter(x => { const s = stops.find(y => y.id === x.sid); return s && s.r.some(r => lineOf(r) !== lineOf(ride.r)) || x.sid === 'place-kencl'; });
+    const xfer = (xs.filter(x => PIN.includes(x.sid)).concat(xs)).filter((x,i,a) => a.findIndex(y => y.sid === x.sid) === i).slice(0, 2);
+    for (const x of xfer) {
+      const p = await peek(x.sid, x.t, ride.r);
+      if (view !== 'ride') return;
+      if (p && p.length) h += `<div class="sec">Connections at ${esc(x.n)} · you arrive ${when(x.t)}</div>`
+        + p.map(y => `<div class="lat"><span>${headOf(y)}</span>${mini(y.cars, y.r)}<b>${when(y.t)}</b></div>`).join('');
+    }
+    if (ups.length) h += '<div class="sec">All stops</div>' + ups.map(x => row(x, PIN.includes(x.sid))).join('');
+    else h += '<div class="none">No stop times right now</div>';
     $('main').innerHTML = h; ok();
   } catch(e) {
     if (e.message === '404') { $('main').innerHTML = '<div class="msg">This train finished its trip.</div>'; return; }
     fail();
   }
 }
+
+// ---- Find bus ----
+let busSet = null, busDir = null;
+function bus1(){
+  view = 'bus1'; nav();
+  $('st').textContent = 'Find bus';
+  $('main').innerHTML = BUS.map((b,i) => `<button data-bs="${i}">${b.n}</button>`).join('');
+}
+function bus2(){
+  view = 'bus2'; nav();
+  $('st').textContent = BUS[busSet].n;
+  $('main').innerHTML = '<button data-bd="1">To Harvard</button><button data-bd="0">Outbound from Harvard</button>';
+}
+async function busStops(b){
+  const k = 'bus_' + b.r.join('_');
+  try { const c = JSON.parse(localStorage[k] || 'null'); if (c && Date.now() - c.t < 2592e6) return c.ids; } catch(e) {}
+  const j = await api(`/stops?filter[route]=${b.r.join(',')}&filter[direction_id]=1&fields[stop]=name`);
+  const ids = j.data.filter(s => b.words.every(w => s.attributes.name.toLowerCase().includes(w))).map(s => s.id);
+  try { localStorage[k] = JSON.stringify({t:Date.now(), ids}); } catch(e) {}
+  return ids;
+}
+async function loadBus(){
+  const b = BUS[busSet];
+  try {
+    const sid = busDir === 1 ? (await busStops(b)).join(',') : 'place-harsq';
+    if (!sid) { $('main').innerHTML = '<div class="msg">Couldn’t find that stop.</div>'; return; }
+    const j = await api(`/predictions?filter[stop]=${sid}&filter[route]=${b.r.join(',')}&filter[direction_id]=${busDir}&include=trip&fields[trip]=headsign`);
+    if (view !== 'bus3') return;
+    const p = parsePred(j);
+    $('main').innerHTML = b.r.map(r => {
+      const it = p.filter(x => x.r === r).sort((a,c) => a.t - c.t).slice(0, 2);
+      return `<div class="sec">${r}</div>` + (it.length ? it.map(x => `<div class="bus"><span>${esc(x.h)}</span><b>${when(x.t)}</b></div>`).join('') : '<div class="none">None predicted right now</div>');
+    }).join('');
+    ok();
+  } catch(e) { fail(); }
+}
+
+function keypad(){
+  view = 'num'; nav();
+  $('st').textContent = 'Find a car';
+  $('main').innerHTML = `<div class="num">${numIn || '····'}</div><div class="kp">`
+    + [1,2,3,4,5,6,7,8,9].map(n => `<button data-k="${n}">${n}</button>`).join('')
+    + '<button data-k="del">⌫</button><button data-k="0">0</button><button data-k="go">Go</button></div>';
+}
+
+async function loadNum(){
+  try {
+    const j = await api(`/vehicles?filter[route]=${routes().join(',')}&include=stop,trip`);
+    if (view !== 'num2') return;
+    const inc = {};
+    (j.included || []).forEach(x => inc[x.type + x.id] = x);
+    const v = j.data.find(v => carsOf(v).some(c => c.n === numQ));
+    if (!v) { $('main').innerHTML = `<div class="msg">${numQ} isn’t running right now.</div>`; ok(); return; }
+    const r = v.relationships.route.data.id, cars = carsOf(v), pos = cars.findIndex(c => c.n === numQ) + 1;
+    const s = v.relationships.stop.data && inc['stop' + v.relationships.stop.data.id];
+    const tr = v.relationships.trip.data && inc['trip' + v.relationships.trip.data.id];
+    const o = {vid:v.id, r, d:v.attributes.direction_id, h:tr ? tr.attributes.headsign : '', cars};
+    const st = v.attributes.current_status === 'STOPPED_AT' ? 'At' : 'Next';
+    $('main').innerHTML = `<div class="sec ${GROUPS.find(g => g.r.includes(r)).c}">${headOf(o) || r}</div>`
+      + `<div class="hd" style="margin-top:4px"><span>${s ? st + ': ' + esc(s.attributes.name) : ''}</span><b>car ${pos} of ${cars.length}</b></div>`
+      + consist(cars, r, v.id) + `<button data-follow="1">Follow this train</button>`;
+    numO = o; ok();
+  } catch(e) { fail(); }
+}
+let numO = null;
 
 function find1(){
   view = 'find1'; nav();
@@ -359,7 +511,7 @@ async function loadFind(){
       h += `<div class="sec R">${d ? 'Northbound' : 'Southbound'}</div>` + (x ? trainH(x, false) : '<div class="none">No 1500/1600s headed here yet</div>');
     }
     const seen = new Set(p.filter(y => y.cars.some(OLD)).map(y => y.vid));
-    const j = await api('/vehicles?filter[route]=Red&include=stop&fields[vehicle]=label,carriages,direction_id&fields[stop]=name');
+    const j = await api('/vehicles?filter[route]=Red&include=stop');
     if (view !== 'find2') return;
     const sn = {};
     (j.included || []).forEach(s => sn[s.id] = s.attributes.name);
@@ -385,11 +537,12 @@ function toast(m, u){
   tT = setTimeout(() => { $('toast').style.display = 'none'; lastAdd = null; }, 5000);
 }
 
-function logCar(c, r){
+function logCar(c, r, p){
   if (done(c, r)) { toast(c + ' already logged'); return; }
-  lastAdd = {id:'r' + Date.now(), c, l:lineOf(r), s:stop ? stop.n : '', t:Date.now(), ok:false};
+  if (p && done(p, r)) p = '';
+  lastAdd = {id:'r' + Date.now(), c, p:p || undefined, l:lineOf(r), s:view === 'ride' && ride && ride.at ? ride.at : stop ? stop.n : '', t:Date.now(), ok:false};
   rides.unshift(lastAdd); save(); sync('add', lastAdd);
-  toast('Logged ' + c, true); markCars();
+  toast('Logged ' + c + (p ? '/' + p.slice(-2) : ''), true); markCars();
 }
 
 function markCars(){ document.querySelectorAll('.car[data-c]').forEach(e => e.classList.toggle('got', done(e.dataset.c, e.dataset.r))); }
@@ -406,7 +559,7 @@ function showLog(){
   $('st').textContent = 'Ride log';
   nav();
   const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
-  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div><small>${x.s}<br>${fmt(x.t)}</small></div>`;
+  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div>${x.p ? `<div class="car ${cls(x.p, x.l || '')}"><i></i><span>${x.p}</span><u></u></div>` : ''}<small>${x.s}<br>${fmt(x.t)}</small></div>`;
   const open = rides.filter(x => !x.ok), doneN = rides.length - open.length;
   $('main').innerHTML = (open.length ? open.map(row).join('') : '<div class="msg">All checked off.</div>')
     + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '') + keyH();
@@ -418,22 +571,40 @@ function showTrains(){
 
 document.addEventListener('click', ev => {
   const t = ev.target;
-  const car = t.closest('.car[data-c]'); if (car) return logCar(car.dataset.c, car.dataset.r);
+  const car = t.closest('.car[data-c]'); if (car) {
+    logCar(car.dataset.c, car.dataset.r, car.dataset.p);
+    if (car.dataset.v && view !== 'ride') startRide(car.dataset.v, view === 'num2' ? numO : null);
+    return;
+  }
+  if (t.id === 'busBtn') return bus1();
+  const bs = t.closest('[data-bs]'); if (bs) { busSet = +bs.dataset.bs; return bus2(); }
+  const bd = t.closest('[data-bd]'); if (bd) { busDir = +bd.dataset.bd; view = 'bus3'; nav(); $('st').textContent = BUS[busSet].n + (busDir ? ' · to Harvard' : ' · outbound'); $('main').innerHTML = '<div class="msg">Loading…</div>'; return loadBus(); }
   const row = t.closest('.lr'); if (row) {
     const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r);
     row.querySelector('.ck').classList.toggle('on', r.ok);
     clearTimeout(ckT); ckT = setTimeout(() => { if (view === 'log') showLog(); }, 1500);
     return;
   }
+  const lx = t.closest('[data-x]'); if (lx) { exp = lx.dataset.x; clearTimeout(expT); expT = setTimeout(() => { exp = null; render(); }, 5000); return render(); }
   const rd = t.closest('[data-ride]'); if (rd) return startRide(rd.dataset.ride);
   const al = t.closest('[data-al]'); if (al) { alOpen = alOpen === +al.dataset.al ? -1 : +al.dataset.al; return render(); }
   if (t.id === 'findBtn') { openG = -1; return find1(); }
+  if (t.id === 'numBtn') { numIn = ''; return keypad(); }
+  const k = t.closest('[data-k]'); if (k) {
+    const v = k.dataset.k;
+    if (v === 'del') numIn = numIn.slice(0, -1);
+    else if (v === 'go') { if (!numIn) return; }
+    else if (numIn.length < 4) numIn += v;
+    if (v === 'go' || numIn.length === 4) { numQ = numIn; numIn = ''; view = 'num2'; nav(); $('st').textContent = 'Car ' + numQ; $('main').innerHTML = '<div class="msg">Looking…</div>'; return loadNum(); }
+    return keypad();
+  }
+  if (t.closest('[data-follow]') && numO) return startRide(numO.vid, numO);
   const fg = t.closest('[data-fg]'); if (fg) { openG = openG === +fg.dataset.fg ? -1 : +fg.dataset.fg; return find1(); }
   const f = t.closest('[data-f]'); if (f) { fStop = stops.find(x => x.id === f.dataset.f); view = 'find2'; nav(); $('st').textContent = '1500/1600s near ' + fStop.n; $('main').innerHTML = '<div class="msg">Looking…</div>'; scrollTo(0, 0); return loadFind(); }
   if (t.id === 'age') return refresh();
   const g = t.closest('[data-g]'); if (g) { openG = openG === +g.dataset.g ? -1 : +g.dataset.g; picker(view === 'addfav'); return; }
   if (t.closest('[data-key]')) { keyOpen = !keyOpen; return view === 'log' ? showLog() : picker(); }
-  if (t.id === 'backBtn') return view === 'addfav' ? settings() : view === 'ride' ? setStop(stop) : view === 'find2' ? find1() : picker();
+  if (t.id === 'backBtn') return view === 'addfav' ? settings() : view === 'ride' ? (stop ? setStop(stop) : picker()) : view === 'find2' ? find1() : view === 'num2' ? keypad() : view === 'bus2' ? bus1() : view === 'bus3' ? bus2() : picker();
   if (t.id === 'doneBtn') { showDone = !showDone; return showLog(); }
   if (t.id === 'setBtn') return settings();
   const uf = t.closest('[data-unfav]'); if (uf) { S.fav = S.fav.filter(x => x !== uf.dataset.unfav); saveS(); return settings(); }
