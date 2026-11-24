@@ -19,7 +19,7 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .hd{display:flex;justify-content:space-between;padding:0 2px 1px}
 .hd span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:6px}
 .hd b{font-weight:600;white-space:nowrap}
-.soon{color:#FFD60A}
+.soon{color:#FFD60A}.left{color:#8e8e93}
 .ln{display:flex;gap:3px;margin-top:3px}
 .e{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;line-height:10px;color:#8e8e93;text-align:center;width:10px;flex-shrink:0}
 .e.r{transform:none}
@@ -27,7 +27,8 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .car{position:relative;flex:1;height:28px;border-radius:4px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 .car span{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-variant-numeric:tabular-nums}
 .car i,.car u{display:block;height:0;flex-shrink:0}
-.f15,.f16{background:#C9CED4;color:#1F3A7A}.f15 i,.f16 i{height:4px;background:#1F3A7A}.f15 u,.f16 u{height:4px;background:#D4A62A}
+.f15{background:#C9CED4;color:#1F3A7A}.f15 i{height:4px;background:#1F3A7A}.f15 u{height:4px;background:#D4A62A}
+.f16{background:#C9CED4;color:#1E2227;box-shadow:inset 0 0 0 1.5px #FFD60A}.f16 u{height:7px;margin:0 1.5px 1.5px;background:linear-gradient(#DA291C 2px,#C9CED4 2px,#C9CED4 4px,#DA291C 4px,#DA291C 6px,#C9CED4 6px)}
 .f17{background:#fff;color:#111}.f17 i{height:3px;background:#A9AFB6}.f17 u{height:10px;background:#DA291C}
 .f18{background:#4A4F56;color:#fff}.f18 u{height:4px;background:#DA291C}
 .f19{background:#A9AFB6;color:#1E2227}.f19 i{height:4px;background:#DA291C}
@@ -139,7 +140,7 @@ const GRP = [
   ['Orange Line','Orange','O',null,'North Station,Haymarket,State,Downtown Crossing,Chinatown,Tufts Medical Center,Back Bay,Massachusetts Avenue,Ruggles,Roxbury Crossing,Jackson Square,Stony Brook,Green Street,Forest Hills,Community College,Sullivan Square,Assembly,Wellington,Malden Center,Oak Grove']
 ].map(([n,L,c,r,l]) => ({n, L, c, r, order:l.split(',').map(norm), list:[]}));
 let openG = -1, keyOpen = false, armed = false, armT = null;
-const KEYS = [['f15','1500s / 1600s','Red'],['f17','1700s','Red'],['f18','1800s','Red'],['f19','1900s','Red'],['f36','Type 7','Green'],['f38','Type 8','Green'],['f39','Type 9','Green'],['fO1','Orange · roomy'],['fO2','Orange · getting full'],['fO3','Orange · packed'],['fO0','Orange · no data']];
+const KEYS = [['f15','1500s','Red'],['f16','1600s','Red'],['f17','1700s','Red'],['f18','1800s','Red'],['f19','1900s','Red'],['f36','Type 7','Green'],['f38','Type 8','Green'],['f39','Type 9','Green'],['fO1','Orange · roomy'],['fO2','Orange · getting full'],['fO3','Orange · packed'],['fO0','Orange · no data']];
 const keyH = () => `<button class="grp" data-key="1">${keyOpen ? '▾' : '▸'} Color key</button>` + (keyOpen ? '<div class="key">' + KEYS.map(([f,n]) => `<div class="car ${f}"><i></i><span>${n}</span><u></u></div>`).join('') + '</div>' : '');
 const TERM = {'place-alfcl':[['Red',1]],'place-asmnl':[['Red',0]],'place-brntn':[['Red',0]],'place-lake':[['Green-B',0]],'place-clmnl':[['Green-C',0]],'place-river':[['Green-D',0]],'place-hsmnl':[['Green-E',0]],'place-mdftf':[['Green-E',1]],'place-unsqu':[['Green-D',1]],'place-ogmnl':[['Orange',1]],'place-forhl':[['Orange',0]]};
 const isTerm = (id,r,d) => (TERM[id] || []).some(x => x[0] === r && x[1] === d);
@@ -282,14 +283,21 @@ async function refresh(){
   if (view === 'bus3') return loadBus();
 }
 
+// Trains that just pulled out stay on screen (marked "Left") so you can still tap the one you boarded.
+const KEEP = 30000;
+let lastFor = null;
 async function loadStop(){
   if (!stop) return;
   try {
     const rs = routes().filter(r => (stop.r || []).includes(r)).join(',');
     const j = await api(`/predictions?filter[stop]=${stop.id}&filter[route]=${rs}` + PQ);
     if (view !== 'trains') return;
-    last = parsePred(j);
-    got = Date.now(); ok();
+    const now = Date.now(), fresh = parsePred(j);
+    const old = lastFor === stop.id ? last : [];
+    const left = old.filter(x => x.vid && !fresh.some(y => y.vid === x.vid) && (x.gone || x.t - now < 120000))
+      .map(x => x.gone ? x : Object.assign({}, x, {gone:now})).filter(x => now - x.gone < KEEP);
+    last = fresh.concat(left); lastFor = stop.id;
+    got = now; ok();
     render();
     loadAlerts(rs);
     if (TERM[stop.id]) loadLay(rs);
@@ -350,7 +358,7 @@ let exp = null, expT = null;
 const ENDS = {Red:[['ashmont','braintree'],['alewife']], 'Green-B':[['boston college'],['government center']], 'Green-C':[['cleveland circle'],['government center']], 'Green-D':[['riverside'],['union square']], 'Green-E':[['heath street'],['medford/tufts']], Orange:[['forest hills'],['oak grove']]};
 const short = x => x.h && ENDS[x.r] && !ENDS[x.r][x.d].some(e => x.h.toLowerCase().includes(e));
 const headOf = x => (short(x) ? '<em>short</em>' : '') + (x.r.startsWith('Green') ? x.r.slice(-1) + ' · ' : '') + x.h;
-const trainH = (x, tap) => `<div class="tr"><div class="hd${tap && x.vid ? ' tap' : ''}"${tap && x.vid ? ` data-ride="${x.vid}"` : ''}><span>${headOf(x)}</span><b class="${x.t - Date.now() < 90000 ? 'soon' : ''}">${when(x.t)}</b></div>${consist(x.cars, x.r, x.vid)}</div>`;
+const trainH = (x, tap) => `<div class="tr"><div class="hd${tap && x.vid ? ' tap' : ''}"${tap && x.vid ? ` data-ride="${x.vid}"` : ''}><span>${headOf(x)}</span><b class="${x.gone ? 'left' : x.t - Date.now() < 90000 ? 'soon' : ''}">${x.gone ? 'Left' : when(x.t)}</b></div>${consist(x.cars, x.r, x.vid)}</div>`;
 
 function consist(cars, r, vid){
   if (!cars.length) return '<div class="none">Cars not assigned yet</div>';
@@ -371,7 +379,7 @@ function render(){
   for (const g of GROUPS) {
     const rs = g.r.filter(r => (stop.r || []).includes(r) && !isTerm(stop.id, r, g.d));
     if (!rs.length) continue;
-    const all = last.filter(x => rs.includes(x.r) && x.d === g.d && !wl.some(v => v.vid === x.vid)).sort((a,b) => a.t - b.t);
+    const all = last.filter(x => rs.includes(x.r) && x.d === g.d && !wl.some(v => v.vid === x.vid) && !(x.gone && Date.now() - x.gone >= KEEP)).sort((a,b) => a.t - b.t);
     const lab = g.l || rs.map(r => r.slice(-1)).sort().join(' and ') + (g.d ? ' · inbound' : ' · outbound');
     h += `<div class="sec ${g.c}">${lab}</div>`;
     if (!all.length) h += wl.some(v => v.d === g.d && rs.includes(v.r)) ? '<div class="none">Next one is waiting above</div>' : '<div class="none">None predicted right now</div>';
