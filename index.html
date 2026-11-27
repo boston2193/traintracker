@@ -707,10 +707,8 @@ function showLog(){
   $('st').textContent = 'Ride log';
   nav();
   const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
-  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div>${x.p ? `<div class="car ${cls(x.p, x.l || '')}"><i></i><span>${x.p}</span><u></u></div>` : ''}<small>${x.s}<br>${fmt(x.t)}</small><button class="del" data-del="${x.id}" aria-label="Delete">✕</button></div>`;
-  const open = rides.filter(x => !x.ok), doneN = rides.length - open.length;
-  $('main').innerHTML = (open.length ? open.map(row).join('') : '<div class="msg">All checked off.</div>')
-    + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '') + keyH();
+  const row = x => `<div class="lr" data-id="${x.id}"><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div>${x.p ? `<div class="car ${cls(x.p, x.l || '')}"><i></i><span>${x.p}</span><u></u></div>` : ''}<small>${x.s}<br>${fmt(x.t)}</small><button class="del" data-del="${x.id}" aria-label="Delete">✕</button></div>`;
+  $('main').innerHTML = (rides.length ? rides.map(row).join('') : '<div class="msg">Nothing logged yet. Tap a car number on a train to log it.</div>') + keyH();
 }
 
 function showTrains(){
@@ -731,13 +729,6 @@ document.addEventListener('click', ev => {
     const i = rides.findIndex(x => x.id === dl.dataset.del); if (i < 0) return;
     lastDel = {r:rides[i], i}; rides.splice(i, 1); save(); sync('remove', lastDel.r);
     lastAdd = null; lastChk = null; toast('Deleted ' + lastDel.r.c, true); markCars(); return showLog();
-  }
-  const row = t.closest('.lr'); if (row) {
-    const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r);
-    if (r.ok) { lastDel = null; lastChk = r; toast('Checked ' + r.c + (r.p ? '/' + r.p.slice(-2) : ''), true); lastAdd = null; }
-    row.querySelector('.ck').classList.toggle('on', r.ok);
-    clearTimeout(ckT); ckT = setTimeout(() => { if (view === 'log') showLog(); }, 1500);
-    return;
   }
   const lx = t.closest('[data-x]'); if (lx) { exp = lx.dataset.x; clearTimeout(expT); expT = setTimeout(() => { exp = null; render(); }, 5000); return render(); }
   const rd = t.closest('[data-ride]'); if (rd) return startRide(rd.dataset.ride);
