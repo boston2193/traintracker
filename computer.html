@@ -234,7 +234,7 @@ function renderLog(){
   const mx = Math.max(1, ...Object.values(cnt));
   $('prog').innerHTML = FLEETS.map(([f,n]) => `<div class="prog"><span class="mut">${n}</span><div class="bar"><div class="f${f}" style="width:${(cnt[f] || 0) / mx * 100}%"></div></div><span>${cnt[f] || 0}</span></div>`).join('');
   const card = c => `<div class="car ${cls(c, 'Red')}"><i></i><span>${c}</span><u></u></div>`;
-  $('log').innerHTML = rides.map(x => `<div class="lr"><input type="checkbox" data-ck="${x.id}"${x.ok ? ' checked' : ''} aria-label="Checked off">${card(x.c)}${x.p ? card(x.p) : ''}<small>${esc(x.s || '')}<br>${new Date(x.t).toLocaleDateString([], {month:'short', day:'numeric'})}</small><button class="del" data-del="${x.id}" title="Delete">✕</button></div>`).join('')
+  $('log').innerHTML = rides.map(x => `<div class="lr">${card(x.c)}${x.p ? card(x.p) : ''}<small>${esc(x.s || '')}<br>${new Date(x.t).toLocaleDateString([], {month:'short', day:'numeric'})}</small><button class="del" data-del="${x.id}" title="Delete">✕</button></div>`).join('')
     || '<div class="mut" style="margin-top:6px">Nothing logged yet.</div>';
 }
 function logCar(c, p, at){
