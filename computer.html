@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MBTA Cars</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0b0c;color:#eee;font:14px -apple-system,system-ui,sans-serif}
+header{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid #222;position:sticky;top:0;background:#0b0b0c;z-index:5}
+header h1{font-size:16px;font-weight:600;margin:0 16px 0 0}
+header button{background:#1c1c1e;color:#ddd;border:1px solid #333;border-radius:8px;padding:6px 14px;font:inherit;cursor:pointer}
+header button.on{background:#333;color:#fff;border-color:#555}
+#age{margin-left:auto;color:#777;font-size:12px}
+.lay{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;padding:20px}
+.cols{display:flex;gap:18px;align-items:flex-start;overflow-x:auto;padding-bottom:10px}
+.col{min-width:300px}
+.col h2{font-size:13px;font-weight:600;color:#999;margin:0 0 6px;text-transform:none}
+.st{display:grid;grid-template-columns:1fr 16px 1fr;align-items:center;min-height:30px}
+.st .nm{grid-column:1/4;grid-row:1;text-align:center;font-size:12px;color:#888;pointer-events:none}
+.st.fav .nm{color:#fff;font-weight:600}
+.st .ln{grid-column:2;grid-row:1/3;align-self:stretch;width:6px;margin:0 auto;border-radius:3px}
+.st .dot{grid-column:2;grid-row:1;width:12px;height:12px;border-radius:50%;background:#0b0b0c;border:2px solid;justify-self:center;z-index:1}
+.st .l,.st .r{grid-row:1;display:flex;gap:4px;flex-wrap:wrap}
+.st .l{grid-column:1;justify-content:flex-end;padding-right:6px}
+.st .r{grid-column:3;padding-left:6px}
+.st .nm{grid-row:2;margin-top:-2px}
+.tn{display:flex;gap:1px;padding:2px;border-radius:5px;cursor:pointer;border:1px solid transparent;align-items:center}
+.tn:hover{border-color:#666}.tn.sel{border-color:#fff}
+.tn.mv{opacity:.65}
+.tn .car{width:13px;height:16px;flex:0 0 13px;border-radius:2px}
+.tn .car span{display:none}
+.tn .nb{font-size:11px;color:#ccc;margin-left:3px;font-variant-numeric:tabular-nums}
+.car{position:relative;height:34px;border-radius:5px;display:flex;flex-direction:column;overflow:hidden;min-width:0;flex:1}
+.car span{flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;font-variant-numeric:tabular-nums}
+.car i,.car u{display:block;height:0;flex-shrink:0}
+.f15{background:#C9CED4;color:#1F3A7A}.f15 i{height:4px;background:#1F3A7A}.f15 u{height:4px;background:#D4A62A}
+.f16{background:#C9CED4;color:#1E2227;box-shadow:inset 0 0 0 1.5px #FFD60A}.f16 u{height:7px;margin:0 1.5px 1.5px;background:linear-gradient(#DA291C 2px,#C9CED4 2px,#C9CED4 4px,#DA291C 4px,#DA291C 6px,#C9CED4 6px)}
+.f17{background:#fff;color:#111}.f17 i{height:3px;background:#A9AFB6}.f17 u{height:10px;background:#DA291C}
+.f18{background:#4A4F56;color:#fff}.f18 u{height:4px;background:#DA291C}
+.f19{background:#A9AFB6;color:#1E2227}.f19 i{height:4px;background:#DA291C}
+.f36,.f37{background:#D2B98C;color:#4A3818}
+.f38{background:#2BB5B0;color:#062F2D}
+.f39{background:#1F5A36;color:#fff}
+.fO0,.fO1,.fO2,.fO3{color:#111}.fO0 i,.fO1 i,.fO2 i,.fO3 i{height:3px;background:#ED8B00}
+.fO0{background:#8E8E93}.fO1{background:#30D158}.fO2{background:#FFD60A}.fO3{background:#FF453A;color:#fff}
+.tn .f16 u{height:4px;margin:0 1px 1px;background:linear-gradient(#DA291C 1px,#C9CED4 1px,#C9CED4 2px,#DA291C 2px,#DA291C 3px,#C9CED4 3px)}
+.tn .f17 u{height:6px}.tn .f15 i,.tn .f15 u,.tn .f19 i{height:3px}
+.car.got{opacity:.45}
+.car.xmas{outline:2px solid #FF453A;outline-offset:1px;animation:xo 1.2s steps(1) infinite}
+.car.xmas::after{content:'';position:absolute;inset:0;border-radius:inherit;border:3px dotted #FF453A;animation:xm 1.2s steps(1) infinite;pointer-events:none}
+.car.xmas:nth-child(2n),.car.xmas:nth-child(2n)::after{animation-delay:-.4s}.car.xmas:nth-child(3n),.car.xmas:nth-child(3n)::after{animation-delay:-.8s}
+@keyframes xm{0%{border-color:#FF453A;box-shadow:inset 0 0 8px 2px #FF453A}17%{border-color:#FF9F0A;box-shadow:inset 0 0 8px 2px #FF9F0A}33%{border-color:#FFD60A;box-shadow:inset 0 0 8px 2px #FFD60A}50%{border-color:#30D158;box-shadow:inset 0 0 8px 2px #30D158}67%{border-color:#0A84FF;box-shadow:inset 0 0 8px 2px #0A84FF}83%{border-color:#BF5AF2;box-shadow:inset 0 0 8px 2px #BF5AF2}}
+@keyframes xo{0%{outline-color:#30D158}17%{outline-color:#0A84FF}33%{outline-color:#BF5AF2}50%{outline-color:#FF453A}67%{outline-color:#FF9F0A}83%{outline-color:#FFD60A}}
+.tn .car.xmas::after{border-width:2px}
+.tn .car.xmas{outline-width:1px}
+.car.best::before{content:'★';position:absolute;top:-1px;left:3px;font-size:11px;color:#FFD60A;text-shadow:0 0 2px #000,0 0 2px #000}
+.panel{background:#151517;border:1px solid #262628;border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.panel h3{font-size:14px;margin:0 0 8px;font-weight:600}
+.mut{color:#888;font-size:12px}
+.cl{display:flex;gap:4px;margin-top:4px;align-items:stretch}
+.e{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;color:#888;text-align:center;width:12px;flex-shrink:0}
+.e.r{transform:none}
+.cs{display:flex;gap:4px;flex:1}
+.cs .car{cursor:pointer}
+.prog{display:grid;grid-template-columns:70px 1fr 28px;gap:6px;align-items:center;font-size:12px;margin-bottom:4px}
+.bar{height:8px;border-radius:4px;background:#222;overflow:hidden}.bar div{height:100%}
+.lr{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #222;font-size:12px}
+.lr input{margin:0}
+.lr .car{flex:0 0 52px;height:24px}
+.lr small{margin-left:auto;color:#888;text-align:right}
+.lr .del{background:none;border:0;color:#FF6961;cursor:pointer;font-size:14px;padding:2px 6px}
+.key{display:flex;flex-wrap:wrap;gap:6px}.key .car{flex:0 0 92px;height:26px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2c2c2e;border-radius:12px;padding:8px 10px 8px 14px;display:none;align-items:center;gap:12px}
+#toast button{background:#FFD60A;color:#2a2200;border:0;border-radius:8px;padding:4px 12px;font:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<header><h1>MBTA Cars</h1><button data-l="Red" class="on">Red</button><button data-l="Green">Green</button><button data-l="Orange">Orange</button><span id="age"></span></header>
+<div class="lay">
+  <div class="cols" id="map"></div>
+  <div>
+    <div class="panel" id="det"><h3>Train</h3><div class="mut">Click a train on the diagram. Click a car to log it.</div></div>
+    <div class="panel"><h3>Ride log</h3><div class="mut" id="src"></div><div id="prog" style="margin-top:8px"></div><div id="log"></div></div>
+    <div class="panel"><h3>Color key</h3><div class="key" id="key"></div></div>
+  </div>
+</div>
+<div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
+<script>
+// ===== Settings (same values as index.html) =====
+const KEY = 'a0bc163d699f4a85b3b8b444a49e3e08';
+const SYNC = 'https://script.google.com/macros/s/AKfycbw168XU_m9lGvkf1dL7LszLrWlJVFi2uMMikMx5RMB5YzNgaB02uOxO3o7zKRPyAhFP/exec';   // Google Apps Script web app URL – the computer reads and writes your log there
+// ===============================================
+
+const API = 'https://api-v3.mbta.com';
+const $ = id => document.getElementById(id);
+const FAV = ['place-pktrm','place-harsq','place-chmnl','place-dwnxg','place-tapst','place-bcnfd','place-sstat','place-kencl'];
+
+// Each line is drawn as columns; stations listed in direction-0 order (south / outbound).
+const LAYOUT = {
+  Red: {col:'#DA291C', routes:['Red'], cols:[
+    ['Trunk','Alewife,Davis,Porter,Harvard,Central,Kendall/MIT,Charles/MGH,Park Street,Downtown Crossing,South Station,Broadway,Andrew,JFK/UMass'],
+    ['Ashmont branch','Savin Hill,Fields Corner,Shawmut,Ashmont'],
+    ['Braintree branch','North Quincy,Wollaston,Quincy Center,Quincy Adams,Braintree']]},
+  Green: {col:'#00843D', routes:['Green-B','Green-C','Green-D','Green-E'], cols:[
+    ['Downtown','Medford/Tufts,Ball Square,Magoun Square,Gilman Square,East Somerville,Union Square,Lechmere,Science Park/West End,North Station,Haymarket,Government Center,Park Street,Boylston,Arlington,Copley,Hynes Convention Center,Kenmore'],
+    ['B branch','Blandford Street,Boston University East,Boston University Central,Amory Street,Babcock Street,Packards Corner,Harvard Avenue,Griggs Street,Allston Street,Warren Street,Washington Street,Sutherland Road,Chiswick Road,Chestnut Hill Avenue,South Street,Boston College'],
+    ['C branch','Saint Marys Street,Hawes Street,Kent Street,Saint Paul Street,Coolidge Corner,Summit Avenue,Brandon Hall,Fairbanks Street,Washington Square,Tappan Street,Dean Road,Englewood Avenue,Cleveland Circle'],
+    ['D branch','Fenway,Longwood,Brookline Village,Brookline Hills,Beaconsfield,Reservoir,Chestnut Hill,Newton Centre,Newton Highlands,Eliot,Waban,Woodland,Riverside'],
+    ['E branch','Prudential,Symphony,Northeastern University,Museum of Fine Arts,Longwood Medical Area,Brigham Circle,Fenwood Road,Mission Park,Riverway,Back of the Hill,Heath Street']]},
+  Orange: {col:'#ED8B00', routes:['Orange'], cols:[
+    ['Orange Line','Oak Grove,Malden Center,Wellington,Assembly,Sullivan Square,Community College,North Station,Haymarket,State,Downtown Crossing,Chinatown,Tufts Medical Center,Back Bay,Massachusetts Avenue,Ruggles,Roxbury Crossing,Jackson Square,Stony Brook,Green Street,Forest Hills']]}
+};
+const norm = s => s.toLowerCase().replace(/^st\.? /,'saint ').replace(/[^a-z0-9]/g,'');
+let L = 'Red', names = {}, trains = [], sel = null, rides = [], lastAdd = null, tT = null, okT = 0;
+
+async function api(p){
+  const r = await fetch(API + p + (p.includes('?') ? '&' : '?') + 'api_key=' + KEY);
+  if (!r.ok) throw Error(r.status);
+  return r.json();
+}
+
+// ---- cars, liveries, preferences (same rules as the watch) ----
+const OCC = {EMPTY:1, MANY_SEATS_AVAILABLE:1, FEW_SEATS_AVAILABLE:2, STANDING_ROOM_ONLY:3, CRUSHED_STANDING_ROOM_ONLY:3, FULL:3};
+function carsOf(v){
+  const a = v.attributes;
+  const c = (a.carriages || []).filter(x => x.label).map(x => ({n:x.label, o:OCC[x.occupancy_status] || 0}));
+  return c.length ? c : (a.label || '').split('-').filter(Boolean).map(n => ({n, o:0}));
+}
+const lineOf = r => r.startsWith('Green') ? 'Green' : r;
+// Holiday vehicles with Christmas lights. Set HOLIDAY = false when they're gone.
+const HOLIDAY = true;
+const XMAS = {Red:['1938','1939','1940','1941','1962','1963'], Orange:['1410','1411','1462','1463','1502','1503'], Green:['3704','3875']};
+const isX = (c, r) => HOLIDAY && (XMAS[lineOf(r || (c.startsWith('3') ? 'Green' : 'Red'))] || []).includes(c);
+const cls = (c, r, o) => (r === 'Orange' ? 'fO' + (o || 0) : 'f' + c.slice(0,2)) + (isX(c, r) ? ' xmas' : '');
+function pref(x, r){
+  const f = x.n.slice(0, 2);
+  if (r === 'Orange' || (r === 'Red' && f === '19')) return x.o ? x.o : null;
+  if (r === 'Red') return {'16':1, '15':2, '17':3}[f] || null;
+  if (r.startsWith('Green')) return {'36':1, '37':1, '39':1, '38':2}[f] || null;
+  return null;
+}
+function bestOf(cars, r){
+  const s = cars.map(x => pref(x, r)), ok = s.filter(v => v != null);
+  if (ok.length < 2) return new Set();
+  const m = Math.min(...ok);
+  if (ok.every(v => v === m)) return new Set();
+  return new Set(cars.filter((x,i) => s[i] === m).map(x => x.n));
+}
+function pairOf(cars, i, r){
+  if (r !== 'Red' || cars.length < 2) return '';
+  const n = +cars[i].n, nb = [cars[i-1], cars[i+1]].filter(Boolean).find(x => +x.n === (n ^ 1));
+  return nb ? nb.n : '';
+}
+const done = (c, r) => { const l = lineOf(r); return rides.some(x => (x.c === c || x.p === c) && (x.l ? x.l === l : l === 'Red' || l === 'Green')); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---- data ----
+async function loadNames(){
+  const rs = Object.values(LAYOUT).flatMap(x => x.routes).join(',');
+  const j = await api('/stops?filter[route]=' + rs + '&fields[stop]=name');
+  j.data.forEach(s => names[norm(s.attributes.name)] = s.id);
+}
+
+async function loadTrains(){
+  try {
+    const j = await api(`/vehicles?filter[route]=${LAYOUT[L].routes.join(',')}&include=stop,trip`);
+    const inc = {};
+    (j.included || []).forEach(x => inc[x.type + x.id] = x);
+    trains = j.data.map(v => {
+      const s = v.relationships.stop.data && inc['stop' + v.relationships.stop.data.id];
+      const ps = s && s.relationships && s.relationships.parent_station && s.relationships.parent_station.data;
+      const tr = v.relationships.trip.data && inc['trip' + v.relationships.trip.data.id];
+      return {vid:v.id, r:v.relationships.route.data.id, d:v.attributes.direction_id, st:v.attributes.current_status,
+        sid:ps ? ps.id : s && s.id, sn:s ? s.attributes.name : '', h:tr ? tr.attributes.headsign : '', cars:carsOf(v)};
+    });
+    okT = Date.now(); $('age').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit', second:'2-digit'});
+    draw();
+  } catch(e) { $('age').textContent = 'Can’t reach the MBTA'; }
+}
+
+// ---- diagram ----
+function draw(){
+  const lay = LAYOUT[L];
+  $('map').innerHTML = lay.cols.map(([title, list]) => `<div class="col"><h2>${title}</h2>` + list.split(',').map(n => {
+    const id = names[norm(n)];
+    const here = trains.filter(t => t.sid && t.sid === id);
+    const side = d => here.filter(t => t.d === d).map(t => `<div class="tn${t.st === 'STOPPED_AT' ? '' : ' mv'}${sel === t.vid ? ' sel' : ''}" data-t="${t.vid}" title="${esc(t.h)}">`
+      + t.cars.map(x => `<div class="car ${cls(x.n, t.r, x.o)}"><i></i><span></span><u></u></div>`).join('')
+      + `<span class="nb">${t.cars[0] ? t.cars[0].n : ''}</span></div>`).join('');
+    return `<div class="st${FAV.includes(id) ? ' fav' : ''}"><div class="ln" style="background:${lay.col}"></div><div class="dot" style="border-color:${lay.col}"></div><div class="l">${side(1)}</div><div class="r">${side(0)}</div><div class="nm">${esc(n)}</div></div>`;
+  }).join('') + '</div>').join('');
+  det();
+}
+
+function det(){
+  const t = trains.find(x => x.vid === sel);
+  if (!t) { $('det').innerHTML = '<h3>Train</h3><div class="mut">Click a train on the diagram. Dimmed trains are between stations, heading to the stop they’re drawn at. Left side is northbound / inbound, right side southbound / outbound.</div>'; return; }
+  const B = bestOf(t.cars, t.r), rows = [];
+  for (let i = 0; i < t.cars.length; i += 3) rows.push(t.cars.slice(i, i+3));
+  $('det').innerHTML = `<h3>${t.r.startsWith('Green') ? t.r.slice(-1) + ' · ' : ''}${esc(t.h) || t.r}</h3>`
+    + `<div class="mut">${t.st === 'STOPPED_AT' ? 'At' : 'Next'}: ${esc(t.sn)}</div>`
+    + rows.map((l,i) => `<div class="cl"><div class="e">${i ? 'MID' : 'FWD'}</div><div class="cs">${l.map(x => {
+        const can = t.r !== 'Orange';
+        return `<div class="car ${cls(x.n, t.r, x.o)}${can && done(x.n, t.r) ? ' got' : ''}${B.has(x.n) ? ' best' : ''}"${can ? ` data-c="${x.n}" data-p="${pairOf(t.cars, t.cars.indexOf(x), t.r)}"` : ''}><i></i><span>${x.n}</span><u></u></div>`;
+      }).join('')}</div><div class="e r">${i === rows.length-1 ? 'AFT' : 'MID'}</div></div>`).join('')
+    + `<div class="mut" style="margin-top:8px">${t.r === 'Orange' ? 'Orange cars are colored by crowding.' : 'Click a car to log it (Red Line logs its married pair too).'}</div>`;
+}
+
+// ---- ride log ----
+async function loadLog(){
+  if (SYNC) {
+    try {
+      const r = await fetch(SYNC);
+      rides = (await r.json()).sort((a,b) => b.t - a.t).map(x => Object.assign(x, {p:x.p || undefined, l:x.l || (x.c.startsWith('3') ? 'Green' : 'Red')}));
+      $('src').textContent = 'From your Google Sheet';
+    } catch(e) { $('src').textContent = 'Couldn’t read the Google Sheet. Check the SYNC address.'; }
+  } else {
+    try { rides = JSON.parse(localStorage.rides || '[]'); } catch(e) { rides = []; }
+    $('src').textContent = 'Only on this computer. Add your Google Sheet address (SYNC) to see the watch’s log here.';
+  }
+  renderLog();
+}
+function saveLocal(){ if (!SYNC) try { localStorage.rides = JSON.stringify(rides); } catch(e) {} }
+function sync(a, e){
+  if (!SYNC) return;
+  fetch(SYNC, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(Object.assign({a}, e))}).catch(() => {});
+}
+const FLEETS = [['15','1500s'],['16','1600s'],['17','1700s'],['18','1800s'],['19','1900s'],['36','Type 7'],['38','Type 8'],['39','Type 9']];
+function renderLog(){
+  const cnt = {};
+  rides.forEach(x => [x.c, x.p].filter(Boolean).forEach(c => { const f = c.slice(0,2) === '37' ? '36' : c.slice(0,2); cnt[f] = (cnt[f] || 0) + 1; }));
+  const mx = Math.max(1, ...Object.values(cnt));
+  $('prog').innerHTML = FLEETS.map(([f,n]) => `<div class="prog"><span class="mut">${n}</span><div class="bar"><div class="f${f}" style="width:${(cnt[f] || 0) / mx * 100}%"></div></div><span>${cnt[f] || 0}</span></div>`).join('');
+  const card = c => `<div class="car ${cls(c, 'Red')}"><i></i><span>${c}</span><u></u></div>`;
+  $('log').innerHTML = rides.map(x => `<div class="lr"><input type="checkbox" data-ck="${x.id}"${x.ok ? ' checked' : ''} aria-label="Checked off">${card(x.c)}${x.p ? card(x.p) : ''}<small>${esc(x.s || '')}<br>${new Date(x.t).toLocaleDateString([], {month:'short', day:'numeric'})}</small><button class="del" data-del="${x.id}" title="Delete">✕</button></div>`).join('')
+    || '<div class="mut" style="margin-top:6px">Nothing logged yet.</div>';
+}
+function logCar(c, p, at){
+  const t = trains.find(x => x.vid === sel);
+  if (done(c, t.r)) return toast(c + ' already logged');
+  if (p && done(p, t.r)) p = '';
+  lastAdd = {id:'r' + Date.now(), c, p:p || undefined, l:lineOf(t.r), s:t.sn, t:Date.now(), ok:false};
+  rides.unshift(lastAdd); saveLocal(); sync('add', lastAdd);
+  toast('Logged ' + c + (p ? '/' + p.slice(-2) : ''), true); renderLog(); det();
+}
+function toast(m, u){
+  $('tmsg').textContent = m; $('undo').style.display = u ? '' : 'none'; $('toast').style.display = 'flex';
+  clearTimeout(tT); tT = setTimeout(() => { $('toast').style.display = 'none'; lastAdd = null; }, 6000);
+}
+
+$('key').innerHTML = [['f15','1500s'],['f16','1600s'],['f17','1700s'],['f18','1800s'],['f19','1900s'],['f36','Type 7'],['f38','Type 8'],['f39','Type 9'],['fO1','Orange roomy'],['fO2','Orange filling'],['fO3','Orange packed']]
+  .map(([c,n]) => `<div class="car ${c}"><i></i><span>${n}</span><u></u></div>`).join('');
+
+document.addEventListener('click', ev => {
+  const t = ev.target;
+  const l = t.closest('[data-l]'); if (l) { L = l.dataset.l; sel = null; document.querySelectorAll('[data-l]').forEach(b => b.classList.toggle('on', b === l)); trains = []; draw(); return loadTrains(); }
+  const tn = t.closest('[data-t]'); if (tn) { sel = tn.dataset.t; return draw(); }
+  const c = t.closest('[data-c]'); if (c) return logCar(c.dataset.c, c.dataset.p);
+  const dl = t.closest('[data-del]'); if (dl) { const r = rides.find(x => x.id === dl.dataset.del); if (r && confirm('Delete ' + r.c + (r.p ? '/' + r.p : '') + ' from your ride log?')) { rides = rides.filter(x => x !== r); saveLocal(); sync('remove', r); renderLog(); det(); } return; }
+  if (t.id === 'undo' && lastAdd) { rides = rides.filter(x => x.id !== lastAdd.id); saveLocal(); sync('remove', lastAdd); lastAdd = null; $('toast').style.display = 'none'; renderLog(); det(); }
+});
+document.addEventListener('change', ev => {
+  const id = ev.target.dataset.ck; if (!id) return;
+  const r = rides.find(x => x.id === id); r.ok = ev.target.checked; saveLocal(); sync('check', r);
+});
+
+setInterval(() => { if (document.visibilityState === 'visible') loadTrains(); }, 15000);
+setInterval(() => { if (document.visibilityState === 'visible' && SYNC) loadLog(); }, 60000);
+(async () => {
+  loadLog();
+  try { await loadNames(); } catch(e) { $('age').textContent = 'Can’t reach the MBTA'; return; }
+  loadTrains();
+})();
+</script>
+</body>
+</html>
