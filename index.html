@@ -58,6 +58,14 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .lat[data-x]{cursor:pointer}
 .ns{margin-top:6px;padding:4px 2px}.ns small{display:block;font-size:11px;color:#8e8e93}.ns div{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
 .ns span{font-size:19px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ns b{font-size:19px;font-weight:600;color:#FFD60A;white-space:nowrap}
+.car.xmas{outline:2px solid #FF453A;outline-offset:1px;animation:xo 1.2s steps(1) infinite}
+.car.xmas::after{content:'';position:absolute;inset:0;border-radius:inherit;border:3px dotted #FF453A;animation:xm 1.2s steps(1) infinite;pointer-events:none}
+.car.xmas:nth-child(2n),.car.xmas:nth-child(2n)::after{animation-delay:-.4s}.car.xmas:nth-child(3n),.car.xmas:nth-child(3n)::after{animation-delay:-.8s}
+@keyframes xm{0%{border-color:#FF453A;box-shadow:inset 0 0 8px 2px #FF453A}17%{border-color:#FF9F0A;box-shadow:inset 0 0 8px 2px #FF9F0A}33%{border-color:#FFD60A;box-shadow:inset 0 0 8px 2px #FFD60A}50%{border-color:#30D158;box-shadow:inset 0 0 8px 2px #30D158}67%{border-color:#0A84FF;box-shadow:inset 0 0 8px 2px #0A84FF}83%{border-color:#BF5AF2;box-shadow:inset 0 0 8px 2px #BF5AF2}}
+@keyframes xo{0%{outline-color:#30D158}17%{outline-color:#0A84FF}33%{outline-color:#BF5AF2}50%{outline-color:#FF453A}67%{outline-color:#FF9F0A}83%{outline-color:#FFD60A}}
+.f70,.f71,.f72,.f73,.f74,.f75,.f76,.f77{background:#E6E9EC;color:#0B2E6B}.f70 u,.f71 u,.f72 u,.f73 u,.f74 u,.f75 u,.f76 u,.f77 u{height:5px;background:#003DA5}
+.fBus{background:#FFC72C;color:#111}
+.xb{display:flex;align-items:center;gap:6px;padding:5px 2px;border-top:.5px solid #222;font-size:12px}.xb .car{flex:0 0 46px;height:22px}
 .car.best::before{content:'★';position:absolute;top:-2px;left:2px;font-size:10px;color:#FFD60A;text-shadow:0 0 2px #000,0 0 2px #000}
 .tip{background:#0b2a4a;color:#9FD0FF;border-radius:10px;padding:5px 8px;margin-top:4px;font-size:12px}
 .big{background:#5a0000;color:#fff;border-radius:12px;padding:8px 10px;margin-top:6px;font-size:13px;line-height:1.3}
@@ -77,6 +85,7 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .bus span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-right:6px}
 .none{font-size:11px;color:#666;padding:2px}
 .msg{color:#888;font-size:12px;padding:8px 2px}
+#wake{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#0A84FF;color:#fff;border-radius:10px;padding:3px 10px;font-size:12px;display:none;z-index:9}
 #toast{position:fixed;left:6px;right:6px;bottom:52px;background:#2c2c2e;border-radius:14px;padding:6px 6px 6px 12px;display:none;align-items:center;justify-content:space-between}
 #toast button{width:auto;margin:0;background:#FFD60A;color:#2a2200;padding:4px 12px}
 .lr{display:flex;align-items:center;gap:8px;padding:6px 2px;border-top:.5px solid #2a2a2a}
@@ -84,20 +93,26 @@ button{font:inherit;color:#fff;background:#1c1c1e;border:0;border-radius:12px;pa
 .ck.on{background:#30D158;border-color:#30D158}
 .lr .car{flex:0 0 52px}
 .lr small{color:#888;font-size:11px;margin-left:auto;text-align:right}
+.lr .del{width:26px;height:26px;margin:0;padding:0;text-align:center;border-radius:50%;background:#3a1a1a;color:#FF6961;flex-shrink:0;font-size:13px}
 </style>
 </head>
 <body>
 <div id="hdr"><span id="st">Loading…</span><span id="age"></span></div>
 <div id="main"></div>
 <div id="nav"><button id="backBtn">‹ Back</button><button id="homeBtn" aria-label="Stops">🏠</button><button id="logBtn" aria-label="Ride log">✅</button></div>
-<div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
+<div id="wake">↻ Updated</div><div id="toast"><span id="tmsg"></span><button id="undo">Undo</button></div>
 <script>
 // ===== Settings =====
 const KEY = 'a0bc163d699f4a85b3b8b444a49e3e08';     // free MBTA API key (api-v3.mbta.com) – optional but recommended
-const SYNC = '';    // Google Apps Script web app URL – optional, sends your log to a Google Sheet
+const SYNC = 'https://script.google.com/macros/s/AKfycbw168XU_m9lGvkf1dL7LszLrWlJVFi2uMMikMx5RMB5YzNgaB02uOxO3o7zKRPyAhFP/exec';    // Google Apps Script web app URL – optional, sends your log to a Google Sheet
 // "Your stops" in the train view, by line and direction: [outbound/southbound, inbound/northbound]
 const PINS = {Red:[['place-pktrm'], ['place-harsq']], Green:[['place-tapst','place-bcnfd'], ['place-pktrm']]};
 const GLDOWN_PIN = 'place-dwnxg';  // when Green Line is shuttled, Red into town pins DTX and shows Forest Hills trains
+// Holiday vehicles with Christmas lights. Set HOLIDAY = false when they're gone.
+const HOLIDAY = true;
+const XMAS = {Red:['1938','1939','1940','1941','1962','1963'], Orange:['1410','1411','1462','1463','1502','1503'],
+  Blue:['700','701','714','715','762','763'], Green:['3704','3875'], Bus:['1981','2027']};
+const XFER_MIN = 3;  // minutes to walk from the bus to the Red Line platform at Harvard
 const BUS = [  // Find bus: inbound stop is matched by words in its name; outbound leaves from Harvard
   {n:'74 / 75 / 78', r:['74','75','78'], words:['concord','huron']},
   {n:'71 / 73', r:['71','73'], words:['auburn','sparks']}
@@ -148,7 +163,7 @@ const GRP = [
   ['Orange Line','Orange','O',null,'North Station,Haymarket,State,Downtown Crossing,Chinatown,Tufts Medical Center,Back Bay,Massachusetts Avenue,Ruggles,Roxbury Crossing,Jackson Square,Stony Brook,Green Street,Forest Hills,Community College,Sullivan Square,Assembly,Wellington,Malden Center,Oak Grove']
 ].map(([n,L,c,r,l]) => ({n, L, c, r, order:l.split(',').map(norm), list:[]}));
 let openG = -1, keyOpen = false, armed = false, armT = null;
-const KEYS = [['f15','1500s','Red'],['f16','1600s','Red'],['f17','1700s','Red'],['f18','1800s','Red'],['f19','1900s','Red'],['f36','Type 7','Green'],['f38','Type 8','Green'],['f39','Type 9','Green'],['fO1','Orange · roomy'],['fO2','Orange · getting full'],['fO3','Orange · packed'],['fO0','Orange · no data']];
+const KEYS = (HOLIDAY ? [['f19 xmas','Holiday lights']] : []).concat([['f15','1500s','Red'],['f16','1600s','Red'],['f17','1700s','Red'],['f18','1800s','Red'],['f19','1900s','Red'],['f36','Type 7','Green'],['f38','Type 8','Green'],['f39','Type 9','Green'],['fO1','Orange · roomy'],['fO2','Orange · getting full'],['fO3','Orange · packed'],['fO0','Orange · no data']]);
 const keyH = () => `<button class="grp" data-key="1">${keyOpen ? '▾' : '▸'} Color key</button>` + (keyOpen ? '<div class="key">' + KEYS.map(([f,n]) => `<div class="car ${f}"><i></i><span>${n}</span><u></u></div>`).join('') + '</div>' : '');
 const TERM = {'place-alfcl':[['Red',1]],'place-asmnl':[['Red',0]],'place-brntn':[['Red',0]],'place-lake':[['Green-B',0]],'place-clmnl':[['Green-C',0]],'place-river':[['Green-D',0]],'place-hsmnl':[['Green-E',0]],'place-mdftf':[['Green-E',1]],'place-unsqu':[['Green-D',1]],'place-ogmnl':[['Orange',1]],'place-forhl':[['Orange',0]]};
 const isTerm = (id,r,d) => (TERM[id] || []).some(x => x[0] === r && x[1] === d);
@@ -159,7 +174,7 @@ function snap(){
   d.k = view + '|' + (view === 'trains' ? stop && stop.id : view === 'ride' ? ride && ride.vid : view === 'find2' ? fStop && fStop.id : view === 'num2' ? numQ : view === 'bus2' ? busSet : view === 'bus3' ? busSet + '' + busDir : '');
   return d;
 }
-const LBL = d => ({pick:'Stops', trains:d.stop ? d.stop.n : 'Station', ride:'Train', find1:'Where', find2:'1500s', num:'Keypad', num2:'Car ' + d.numQ, bus1:'Bus', bus2:BUS[d.busSet] ? BUS[d.busSet].n : 'Bus', bus3:'Bus times', log:'Ride log', set:'Settings', addfav:'Add stop'})[d.v] || 'Back';
+const LBL = d => ({hol:'Holiday', pick:'Stops', trains:d.stop ? d.stop.n : 'Station', ride:'Train', find1:'Where', find2:'1500s', num:'Keypad', num2:'Car ' + d.numQ, bus1:'Bus', bus2:BUS[d.busSet] ? BUS[d.busSet].n : 'Bus', bus3:'Bus times', log:'Ride log', set:'Settings', addfav:'Add stop'})[d.v] || 'Back';
 function nav(){
   const d = snap();
   if (!goingBack && cur && cur.k !== d.k) { hist.push(cur); if (hist.length > 25) hist.shift(); }
@@ -175,7 +190,7 @@ function show(d){
   try {
     ({stop, ride, fStop, numQ, numO, busSet, busDir} = d);
     ({pick:() => picker(), trains:() => setStop(d.stop), ride:() => startRide(d.ride.vid, d.ride), find1:find1, find2:openFind2,
-      num:keypad, num2:openNum2, bus1:bus1, bus2:bus2, bus3:openBus3, log:showLog, set:settings, addfav:() => picker(true)}[d.v] || picker)();
+      num:keypad, num2:openNum2, hol:openHol, bus1:bus1, bus2:bus2, bus3:openBus3, log:showLog, set:settings, addfav:() => picker(true)}[d.v] || picker)();
   } finally { goingBack = false; }
 }
 function goBack(){ const p = hist.pop(); if (p) show(p); }
@@ -220,7 +235,7 @@ function picker(adding){
   $('main').innerHTML = (adding ? '' : S.fav.map(id => stops.find(s => s.id === id)).filter(Boolean).map(s => b(s)).join(''))
     + GRP.map((g,i) => g.list.length ? `<button class="grp ${g.c}" data-g="${i}">${openG === i ? '▾' : '▸'} ${g.n}</button>`
       + (openG === i ? g.list.map(s => b(s,1)).join('') : '') : '').join('')
-    + (adding ? '' : '<button id="findBtn">Find 1500/1600s</button><button id="numBtn">Find a car number</button><button id="busBtn">Find bus</button>' + keyH() + '<button id="setBtn">Settings</button>');
+    + (adding ? '' : (HOLIDAY ? '<button id="holBtn">🎄 Find holiday vehicles</button>' : '') + '<button id="findBtn">Find 1500/1600s</button><button id="numBtn">Find a car number</button><button id="busBtn">Find bus</button>' + keyH() + '<button id="setBtn">Settings</button>');
 }
 
 function settings(){
@@ -268,7 +283,7 @@ function parsePred(j){
     const vid = rl.vehicle.data && rl.vehicle.data.id;
     const v = vid && inc['vehicle' + vid];
     const tr = rl.trip.data && inc['trip' + rl.trip.data.id];
-    const x = {r:rl.route.data.id, d:a.direction_id, t, dt:Date.parse(a.departure_time), vid, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
+    const x = {tid:rl.trip.data && rl.trip.data.id, r:rl.route.data.id, d:a.direction_id, t, dt:Date.parse(a.departure_time), vid, h:tr ? tr.attributes.headsign : '', cars:v ? carsOf(v) : []};
     if (vid) TV[vid] = x;
     return x;
   }).filter(x => !isNaN(x.t) && x.t - now > -60000);
@@ -290,6 +305,7 @@ async function refresh(){
   if (view === 'find2') return loadFind();
   if (view === 'num2') return loadNum();
   if (view === 'bus3') return loadBus();
+  if (view === 'hol') return loadHol();
 }
 
 // Trains that just pulled out stay on screen (marked "Left") so you can still tap the one you boarded.
@@ -352,7 +368,8 @@ function when(t){
   return s <= 30 ? 'Now' : s < 90 ? '1 min' : Math.round(s/60) + ' min';
 }
 
-const cls = (c, r, o) => r === 'Orange' ? 'fO' + (o || 0) : 'f' + c.slice(0,2);
+const isX = (c, r) => HOLIDAY && (XMAS[r === 'Bus' ? 'Bus' : lineOf(r || (c.startsWith('3') ? 'Green' : 'Red'))] || []).includes(c);
+const cls = (c, r, o) => (r === 'Orange' ? 'fO' + (o || 0) : r === 'Bus' ? 'fBus' : 'f' + c.slice(0,2)) + (isX(c, r) ? ' xmas' : '');
 const done = (c, r) => { const L = lineOf(r); return rides.some(x => (x.c === c || x.p === c) && (x.l ? x.l === L : L === 'Red' || L === 'Green')); };
 // Red Line married pair: the car coupled right next to it in the live consist, numbered one off (1630/1631).
 // Green Line cars log on their own. If no partner is found, only the tapped car is logged.
@@ -361,7 +378,7 @@ function pairOf(cars, i, r){
   const n = +cars[i].n, nb = [cars[i-1], cars[i+1]].filter(Boolean).find(x => +x.n === (n ^ 1));
   return nb ? nb.n : '';
 }
-const carH = (r, vid, all, B) => (x, j) => r === 'Orange' ? `<div class="car ${cls(x.n, r, x.o)}${B && B.has(x.n) ? ' best' : ''}"><i></i><span>${x.n}</span><u></u></div>`
+const carH = (r, vid, all, B) => (x, j) => r === 'Orange' || r === 'Blue' ? `<div class="car ${cls(x.n, r, x.o)}${B && B.has(x.n) ? ' best' : ''}"><i></i><span>${x.n}</span><u></u></div>`
   : `<div class="car ${cls(x.n, r)}${done(x.n, r) ? ' got' : ''}${B && B.has(x.n) ? ' best' : ''}" data-c="${x.n}" data-r="${r}" data-p="${all ? pairOf(all, all.indexOf(x), r) : ''}"${vid ? ` data-v="${vid}"` : ''}><i></i><span>${x.n}</span><u></u>${x.o ? `<b class="oc o${x.o}"></b>` : ''}</div>`;
 // Which car you'd rather ride: lower score is better. null = no preference.
 //  Red 1500/1600/1700: 1600 > 1500 > 1700. Red 1900s and Orange: least crowded (green, then yellow).
@@ -479,7 +496,7 @@ async function loadRide(){
     const row = (x, pin) => `<div class="sr${pin ? ' pin' : ''}"><span>${esc(x.n)}</span><b>${pin ? when(x.t) + ' | ' + clock(x.t) : when(x.t)}</b></div>`;
     const pins = ups.filter(x => PIN.includes(x.sid));
     let h = (gd ? '<div class="big"><b>⚠️ Green Line shuttles</b>Get off at Downtown Crossing for the Orange Line to Forest Hills.</div>' : '')
-      + `<div class="sec ${GROUPS.find(g => g.r.includes(ride.r)).c}">${headOf(ride)}</div>`
+      + `<div class="sec ${(GROUPS.find(g => g.r.includes(ride.r)) || {}).c}">${headOf(ride)}</div>`
       + `<div class="ns"><small>${here ? 'At' : 'Next stop'}</small><div><span>${esc(ride.at)}</span><b>${here ? 'now' : ups[0] ? when(ups[0].t) : ''}</b></div></div>`
       + consist(ride.cars, ride.r);
     if (pins.length) h += '<div class="sec">Your stops</div>' + pins.map(x => row(x, true)).join('');
@@ -529,8 +546,53 @@ async function loadBus(){
     if (view !== 'bus3') return;
     const p = parsePred(j);
     const it = p.sort((a,c) => a.t - c.t).slice(0, 6);
-    $('main').innerHTML = it.length ? it.map(x => `<div class="bus"><span>${x.r}</span><b>${when(x.t)} | ${clock(x.t)}</b></div>`).join('') : '<div class="none">None predicted right now</div>';
+    // To Harvard: also show the Red Line train into town you'd likely catch after the bus gets there.
+    let atH = {}, red = [];
+    if (busDir === 1 && it.length) {
+      const [hb, hr] = await Promise.all([
+        api(`/predictions?filter[stop]=place-harsq&filter[route]=${b.r.join(',')}&filter[direction_id]=1&fields[prediction]=arrival_time`),
+        api(`/predictions?filter[stop]=place-harsq&filter[route]=Red&filter[direction_id]=0` + PQ)]);
+      if (view !== 'bus3') return;
+      hb.data.forEach(x => { const t = Date.parse(x.attributes.arrival_time); if (x.relationships.trip.data && !isNaN(t)) atH[x.relationships.trip.data.id] = t; });
+      red = parsePred(hr).sort((a,c) => a.t - c.t);
+    }
+    $('main').innerHTML = it.length ? it.map(x => {
+      let s = `<div class="bus"><span>${x.r}</span><b>${when(x.t)} | ${clock(x.t)}</b></div>`;
+      const a = atH[x.tid], tr = a && red.find(y => y.t >= a + XFER_MIN * 60000);
+      if (a) s += `<div class="lat"><span>Harvard ${clock(a)} → Red</span>${tr ? mini(tr.cars, 'Red') + `<b>${clock(tr.t)}</b>` : '<b>–</b>'}</div>`;
+      return s;
+    }).join('') : '<div class="none">None predicted right now</div>';
     ok();
+  } catch(e) { fail(); }
+}
+
+function openHol(){ view = 'hol'; nav(); $('st').textContent = 'Holiday vehicles'; $('main').innerHTML = '<div class="msg">Looking for lights…</div>'; loadHol(); }
+async function loadHol(){
+  try {
+    const [rv, bv] = await Promise.all([
+      api('/vehicles?filter[route]=Red,Orange,Blue,Green-B,Green-C,Green-D,Green-E&include=stop,trip'),
+      api('/vehicles?filter[label]=' + XMAS.Bus.join(',') + '&include=stop,route')]);
+    if (view !== 'hol') return;
+    const inc = {};
+    [rv, bv].forEach(j => (j.included || []).forEach(x => inc[x.type + x.id] = x));
+    const where = v => { const s = v.relationships.stop.data && inc['stop' + v.relationships.stop.data.id]; return s ? (v.attributes.current_status === 'STOPPED_AT' ? 'At ' : 'Next: ') + esc(s.attributes.name) : ''; };
+    let h = '';
+    for (const [L, nm, c] of [['Red','Red Line','R'],['Green','Green Line','G'],['Orange','Orange Line','O'],['Blue','Blue Line','B']]) {
+      const vs = rv.data.filter(v => lineOf(v.relationships.route.data.id) === L && carsOf(v).some(x => XMAS[L].includes(x.n)));
+      h += `<div class="sec ${c}">${nm}</div>`;
+      if (!vs.length) { h += `<div class="none">Not running right now (${XMAS[L][0]}…)</div>`; continue; }
+      for (const v of vs) {
+        const r = v.relationships.route.data.id, tr = v.relationships.trip.data && inc['trip' + v.relationships.trip.data.id];
+        const o = {vid:v.id, r, d:v.attributes.direction_id, h:tr ? tr.attributes.headsign : '', cars:carsOf(v)};
+        TV[v.id] = o;
+        h += `<div class="tr"><div class="hd${r === 'Blue' ? '' : ' tap'}"${r === 'Blue' ? '' : ` data-ride="${v.id}"`}><span>${headOf(o) || r}</span><b>${o.d ? '↑' : '↓'}</b></div><div class="none">${where(v)}</div>${consist(o.cars, r, v.id)}</div>`;
+      }
+    }
+    h += '<div class="sec">Buses</div>' + XMAS.Bus.map(n => {
+      const v = bv.data.find(x => x.attributes.label === n), rt = v && v.relationships.route.data && inc['route' + v.relationships.route.data.id];
+      return `<div class="xb"><div class="car fBus xmas"><i></i><span>${n}</span><u></u></div><span>${v ? 'Route ' + esc(rt ? rt.attributes.short_name : v.relationships.route.data.id) + ' · ' + where(v) : 'Not running right now'}</span></div>`;
+    }).join('');
+    $('main').innerHTML = h; ok();
   } catch(e) { fail(); }
 }
 
@@ -555,7 +617,7 @@ async function loadNum(){
     const tr = v.relationships.trip.data && inc['trip' + v.relationships.trip.data.id];
     const o = {vid:v.id, r, d:v.attributes.direction_id, h:tr ? tr.attributes.headsign : '', cars};
     const st = v.attributes.current_status === 'STOPPED_AT' ? 'At' : 'Next';
-    $('main').innerHTML = `<div class="sec ${GROUPS.find(g => g.r.includes(r)).c}">${headOf(o) || r}</div>`
+    $('main').innerHTML = `<div class="sec ${(GROUPS.find(g => g.r.includes(r)) || {}).c}">${headOf(o) || r}</div>`
       + `<div class="hd" style="margin-top:4px"><span>${s ? st + ': ' + esc(s.attributes.name) : ''}</span><b>car ${pos} of ${cars.length}</b></div>`
       + consist(cars, r, v.id) + `<button data-follow="1">Follow this train</button>`;
     numO = o; ok();
@@ -607,14 +669,14 @@ function toast(m, u){
   $('undo').style.display = u ? '' : 'none';
   $('toast').style.display = 'flex';
   clearTimeout(tT);
-  tT = setTimeout(() => { $('toast').style.display = 'none'; lastAdd = null; lastChk = null; }, 5000);
+  tT = setTimeout(() => { $('toast').style.display = 'none'; lastAdd = null; lastChk = null; lastDel = null; }, 5000);
 }
 
 function logCar(c, r, p){
   if (done(c, r)) { toast(c + ' already logged'); return; }
   if (p && done(p, r)) p = '';
   lastAdd = {id:'r' + Date.now(), c, p:p || undefined, l:lineOf(r), s:view === 'ride' && ride && ride.at ? ride.at : stop ? stop.n : '', t:Date.now(), ok:false};
-  lastChk = null; rides.unshift(lastAdd); save(); sync('add', lastAdd);
+  lastChk = null; lastDel = null; rides.unshift(lastAdd); save(); sync('add', lastAdd);
   toast('Logged ' + c + (p ? '/' + p.slice(-2) : ''), true); markCars();
 }
 
@@ -622,7 +684,14 @@ function markCars(){ document.querySelectorAll('.car[data-c]').forEach(e => e.cl
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let lastChk = null;
+let lastDel = null;
 function undo(){
+  if (lastDel) {
+    const d = lastDel; lastDel = null; rides.splice(Math.min(d.i, rides.length), 0, d.r); save(); sync('add', d.r);
+    if (d.r.ok) sync('check', d.r);
+    $('toast').style.display = 'none'; markCars(); if (view === 'log') showLog();
+    return;
+  }
   if (lastChk) {
     const r = lastChk; lastChk = null; r.ok = false; save(); sync('check', r);
     $('toast').style.display = 'none'; clearTimeout(ckT); if (view === 'log') showLog();
@@ -638,7 +707,7 @@ function showLog(){
   $('st').textContent = 'Ride log';
   nav();
   const fmt = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
-  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div>${x.p ? `<div class="car ${cls(x.p, x.l || '')}"><i></i><span>${x.p}</span><u></u></div>` : ''}<small>${x.s}<br>${fmt(x.t)}</small></div>`;
+  const row = x => `<div class="lr" data-id="${x.id}"><div class="ck${x.ok ? ' on' : ''}"></div><div class="car ${cls(x.c, x.l || '')}"><i></i><span>${x.c}</span><u></u></div>${x.p ? `<div class="car ${cls(x.p, x.l || '')}"><i></i><span>${x.p}</span><u></u></div>` : ''}<small>${x.s}<br>${fmt(x.t)}</small><button class="del" data-del="${x.id}" aria-label="Delete">✕</button></div>`;
   const open = rides.filter(x => !x.ok), doneN = rides.length - open.length;
   $('main').innerHTML = (open.length ? open.map(row).join('') : '<div class="msg">All checked off.</div>')
     + (doneN ? `<button id="doneBtn">${showDone ? 'Hide' : 'Show'} checked (${doneN})</button>` + (showDone ? rides.filter(x => x.ok).map(row).join('') : '') : '') + keyH();
@@ -658,9 +727,14 @@ document.addEventListener('click', ev => {
   if (t.id === 'busBtn') return bus1();
   const bs = t.closest('[data-bs]'); if (bs) { busSet = +bs.dataset.bs; return bus2(); }
   const bd = t.closest('[data-bd]'); if (bd) { busDir = +bd.dataset.bd; return openBus3(); }
+  const dl = t.closest('[data-del]'); if (dl) {
+    const i = rides.findIndex(x => x.id === dl.dataset.del); if (i < 0) return;
+    lastDel = {r:rides[i], i}; rides.splice(i, 1); save(); sync('remove', lastDel.r);
+    lastAdd = null; lastChk = null; toast('Deleted ' + lastDel.r.c, true); markCars(); return showLog();
+  }
   const row = t.closest('.lr'); if (row) {
     const r = rides.find(x => x.id === row.dataset.id); r.ok = !r.ok; save(); sync('check', r);
-    if (r.ok) { lastChk = r; toast('Checked ' + r.c + (r.p ? '/' + r.p.slice(-2) : ''), true); lastAdd = null; }
+    if (r.ok) { lastDel = null; lastChk = r; toast('Checked ' + r.c + (r.p ? '/' + r.p.slice(-2) : ''), true); lastAdd = null; }
     row.querySelector('.ck').classList.toggle('on', r.ok);
     clearTimeout(ckT); ckT = setTimeout(() => { if (view === 'log') showLog(); }, 1500);
     return;
@@ -669,6 +743,7 @@ document.addEventListener('click', ev => {
   const rd = t.closest('[data-ride]'); if (rd) return startRide(rd.dataset.ride);
   const al = t.closest('[data-al]'); if (al) { alOpen = alOpen === +al.dataset.al ? -1 : +al.dataset.al; return render(); }
   if (t.id === 'findBtn') { openG = -1; return find1(); }
+  if (t.id === 'holBtn') return openHol();
   if (t.id === 'numBtn') { numIn = ''; return keypad(); }
   const k = t.closest('[data-k]'); if (k) {
     const v = k.dataset.k;
@@ -708,6 +783,24 @@ document.addEventListener('click', ev => {
 setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 20000);
 setInterval(() => { if (view === 'trains' && got) render(); if (okT) age($('main').classList.contains('dim')); }, 15000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+
+// ---- Wake tap: after WAKE_MS without a tap, the next tap only refreshes the page (it doesn't press anything).
+// Also refreshes on its own when the watch screen wakes up (timers pause while it sleeps).
+const WAKE_MS = 5000;
+let lastTap = Date.now(), lastTick = Date.now(), wT = null;
+function wake(){
+  refresh();
+  $('wake').style.display = 'block'; clearTimeout(wT); wT = setTimeout(() => $('wake').style.display = 'none', 1200);
+}
+document.addEventListener('click', ev => {
+  const now = Date.now(), idle = now - lastTap > WAKE_MS;
+  lastTap = now;
+  if (idle && !ev.target.closest('#undo')) { ev.stopImmediatePropagation(); ev.preventDefault(); wake(); }
+}, true);
+addEventListener('scroll', () => { lastTap = Date.now(); }, {passive:true});
+setInterval(() => { const now = Date.now(); if (now - lastTick > 4000) { lastTap = now - WAKE_MS - 1; refresh(); } lastTick = now; }, 1000);
+addEventListener('pageshow', () => refresh());
+addEventListener('focus', () => refresh());
 
 (async () => {
   const q = new URLSearchParams(location.search);
