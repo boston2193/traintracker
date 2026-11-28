@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "holiday": true,
+  "holidayCars": {
+    "red": [
+      "1938",
+      "1939",
+      "1940",
+      "1941",
+      "1962",
+      "1963"
+    ],
+    "orange": [
+      "1410",
+      "1411",
+      "1462",
+      "1463",
+      "1502",
+      "1503"
+    ],
+    "blue": [
+      "700",
+      "701",
+      "714",
+      "715",
+      "762",
+      "763"
+    ],
+    "green": [
+      "3704",
+      "3875"
+    ],
+    "bus": [
+      "1981",
+      "2027"
+    ]
+  },
+  "pins": {
+    "red": [
+      [
+        "place-pktrm",
+        "place-dwnxg",
+        "place-sstat"
+      ],
+      [
+        "place-sstat",
+        "place-dwnxg",
+        "place-pktrm"
+      ]
+    ],
+    "green": [
+      [
+        "place-pktrm",
+        "place-boyls",
+        "place-coecl"
+      ],
+      [
+        "place-coecl",
+        "place-boyls",
+        "place-pktrm",
+        "place-gover"
+      ]
+    ],
+    "orange": [
+      [
+        "place-north",
+        "place-state",
+        "place-dwnxg",
+        "place-bbsta"
+      ],
+      [
+        "place-bbsta",
+        "place-dwnxg",
+        "place-state",
+        "place-north"
+      ]
+    ],
+    "blue": [
+      [
+        "place-state",
+        "place-gover"
+      ],
+      [
+        "place-gover",
+        "place-state"
+      ]
+    ]
+  },
+  "greenDownPin": "place-dwnxg",
+  "transferMinutes": 3,
+  "message": ""
+}
